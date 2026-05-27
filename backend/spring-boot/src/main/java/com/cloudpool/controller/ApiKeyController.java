@@ -1,0 +1,95 @@
+package com.cloudpool.controller;
+
+import com.cloudpool.model.ApiKey;
+import com.cloudpool.model.User;
+import com.cloudpool.repository.ApiKeyRepository;
+import lombok.Data;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.web.bind.annotation.*;
+
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.SecureRandom;
+import java.time.LocalDateTime;
+import java.util.*;
+
+@RestController
+@RequestMapping("/api/keys")
+@RequiredArgsConstructor
+@CrossOrigin(origins = "*")
+public class ApiKeyController {
+
+    private final ApiKeyRepository apiKeyRepository;
+
+    private User getAuthenticatedUser() {
+        return (User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+    }
+
+    @GetMapping
+    public ResponseEntity<List<ApiKey>> listKeys() {
+        User user = getAuthenticatedUser();
+        List<ApiKey> keys = apiKeyRepository.findByUser(user);
+        // Clear hashes before returning for safety
+        keys.forEach(k -> k.setKeyHash("[REDACTED]"));
+        return ResponseEntity.ok(keys);
+    }
+
+    @PostMapping("/generate")
+    public ResponseEntity<?> generateKey(@RequestBody GenerateKeyRequest request) {
+        User user = getAuthenticatedUser();
+        
+        // Generate plain key: cp_live_ + 32 random alphanumeric characters
+        String plainKey = "cp_live_" + generateRandomString(32);
+        String hashedKey = hashApiKey(plainKey);
+
+        ApiKey apiKey = ApiKey.builder()
+                .user(user)
+                .name(request.getName())
+                .description(request.getDescription())
+                .keyHash(hashedKey)
+                .active(true)
+                .createdAt(LocalDateTime.now())
+                .expiresAt(request.getDaysToLive() > 0 ? LocalDateTime.now().plusDays(request.getDaysToLive()) : null)
+                .build();
+
+        ApiKey saved = apiKeyRepository.save(apiKey);
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("id", saved.getId());
+        response.put("name", saved.getName());
+        response.put("apiKey", plainKey); // Plaintext key shown only once!
+        response.put("createdAt", saved.getCreatedAt());
+        response.put("expiresAt", saved.getExpiresAt());
+
+        return ResponseEntity.ok(response);
+    }
+
+    private String generateRandomString(int length) {
+        String chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+        SecureRandom random = new SecureRandom();
+        StringBuilder sb = new StringBuilder(length);
+        for (int i = 0; i < length; i++) {
+            sb.append(chars.charAt(random.nextInt(chars.length())));
+        }
+        return sb.toString();
+    }
+
+    private String hashApiKey(String apiKeyRaw) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(apiKeyRaw.getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(hash);
+        } catch (Exception e) {
+            throw new RuntimeException("SHA-256 algorithm not available", e);
+        }
+    }
+
+    @Data
+    public static class GenerateKeyRequest {
+        private String name;
+        private String description;
+        private int daysToLive;
+    }
+}

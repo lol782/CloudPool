@@ -1,0 +1,26 @@
+# Maven
+target/
+
+# Logs
+logs/
+*.log
+
+# Database
+*.db
+*.mv.db
+
+# Secrets
+*.json
+*.env
+application-local.yml
+
+# IDE
+.idea/
+.vscode/
+
+# Maven binaries
+apache-maven-*/
+
+# Build
+build/
+dist/

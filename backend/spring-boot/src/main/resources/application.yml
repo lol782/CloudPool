@@ -1,0 +1,116 @@
+spring:
+  application:
+    name: cloudpool
+    version: 0.1.0
+
+  # Server Configuration
+  server:
+    port: 8080
+    servlet:
+      context-path: /
+      max-http-post-size: 10485760  # 10MB
+
+  # JPA/Hibernate Configuration
+  jpa:
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+        use_sql_comments: true
+        jdbc:
+          batch_size: 20
+          fetch_size: 50
+        order_inserts: true
+        order_updates: true
+        generate_statistics: false
+
+  # Jackson Configuration
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+      indent-output: true
+    deserialization:
+      fail-on-unknown-properties: false
+    default-property-inclusion: non_null
+
+  # GraphQL Configuration
+  graphql:
+    path: /graphql
+    graphiql:
+      enabled: true
+      path: /graphiql
+
+# Logging Configuration
+logging:
+  level:
+    root: INFO
+    com.cloudpool: DEBUG
+    org.springframework.web: DEBUG
+    org.springframework.security: DEBUG
+    org.hibernate.SQL: DEBUG
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} - %logger{36} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+  file:
+    name: logs/cloudpool.log
+    max-size: 10MB
+    max-history: 30
+
+# Actuator Configuration
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,metrics,prometheus,info
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: always
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+
+# Custom Application Properties
+cloudpool:
+  jwt:
+    secret: ${JWT_SECRET:your-super-secret-jwt-key-change-this-your-super-secret-jwt-key-change-this}
+    expiration-ms: ${JWT_EXPIRATION_MS:3600000}
+  
+  google-drive:
+    client-id: ${GOOGLE_DRIVE_CLIENT_ID:your-google-client-id}
+    client-secret: ${GOOGLE_DRIVE_CLIENT_SECRET:your-google-client-secret}
+    redirect-uri: ${GOOGLE_DRIVE_REDIRECT_URI:http://localhost:8080/oauth/callback}
+    scopes:
+      - https://www.googleapis.com/auth/drive.file
+      - https://www.googleapis.com/auth/drive.metadata.readonly
+
+  weaviate:
+    url: ${WEAVIATE_URL:http://localhost:8081}
+    api-key: ${WEAVIATE_API_KEY:}
+
+  openai:
+    api-key: ${OPENAI_API_KEY:}
+    model: text-embedding-ada-002
+
+  storage:
+    max-file-size: 5368709120  # 5GB in bytes
+    allowed-extensions:
+      - pdf
+      - doc
+      - docx
+      - xls
+      - xlsx
+      - ppt
+      - pptx
+      - txt
+      - jpg
+      - jpeg
+      - png
+      - gif
+      - zip
+      - rar
+
+  pagination:
+    default-page-size: 20
+    max-page-size: 100
