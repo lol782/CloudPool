@@ -37,6 +37,9 @@ public class StorageServiceTest {
     @Mock
     private FileShareRepository fileShareRepository;
 
+    @Mock
+    private QuotaService quotaService;
+
     @InjectMocks
     private StorageService storageService;
 
@@ -73,6 +76,7 @@ public class StorageServiceTest {
 
     @Test
     void testUploadFileLocalSuccess() throws IOException {
+        when(quotaService.reserveQuota(any(UUID.class), anyLong())).thenReturn(true);
         when(bucketRepository.findByUserAndName(any(User.class), anyString()))
                 .thenReturn(Optional.of(testBucket));
         when(fileMetadataRepository.save(any(FileMetadata.class)))
