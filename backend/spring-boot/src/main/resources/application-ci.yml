@@ -1,0 +1,36 @@
+spring:
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/cloudpool_test}
+    username: ${SPRING_DATASOURCE_USERNAME:cloudpool}
+    password: ${SPRING_DATASOURCE_PASSWORD:password}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: none
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    show-sql: false
+
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    baseline-version: 0
+
+  data:
+    redis:
+      host: ${SPRING_REDIS_HOST:localhost}
+      port: ${SPRING_REDIS_PORT:6379}
+
+  rabbitmq:
+    host: ${SPRING_RABBITMQ_HOST:localhost}
+    port: ${SPRING_RABBITMQ_PORT:5672}
+
+  cache:
+    type: simple
+
+cloudpool:
+  jwt:
+    secret: ${CLOUDPOOL_JWT_SECRET:ci-test-secret-key-minimum-32-chars-long}
+    expiration: 86400000
+  google-drive:
+    client-id: ${CLOUDPOOL_GOOGLE_DRIVE_CLIENT_ID:dummy-client-id}
+    client-secret: ${CLOUDPOOL_GOOGLE_DRIVE_CLIENT_SECRET:dummy-client-secret}
