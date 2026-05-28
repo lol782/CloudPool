@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cloudpool-config
+  namespace: cloudpool
+data:
+  database-host: postgres-service
+  database-name: cloudpool
+  redis-host: redis-service
+  weaviate-url: http://weaviate-service:8080
+  rabbitmq-host: rabbitmq-service

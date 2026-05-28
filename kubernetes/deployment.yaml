@@ -1,0 +1,171 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cloudpool-api
+  namespace: cloudpool
+  labels:
+    app: cloudpool-api
+    version: v1
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: cloudpool-api
+  template:
+    metadata:
+      labels:
+        app: cloudpool-api
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/actuator/prometheus"
+    spec:
+      containers:
+      - name: api
+        image: cloudpool:latest
+        imagePullPolicy: Always
+        
+        ports:
+        - name: http
+          containerPort: 8080
+          protocol: TCP
+        - name: metrics
+          containerPort: 9090
+          protocol: TCP
+
+        env:
+        - name: SPRING_PROFILES_ACTIVE
+          value: "prod"
+        
+        - name: DATABASE_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: cloudpool-config
+              key: database-host
+        
+        - name: DATABASE_NAME
+          valueFrom:
+            configMapKeyRef:
+              name: cloudpool-config
+              key: database-name
+        
+        - name: DATABASE_USER
+          valueFrom:
+            secretKeyRef:
+              name: cloudpool-secrets
+              key: database-user
+        
+        - name: DATABASE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: cloudpool-secrets
+              key: database-password
+        
+        - name: REDIS_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: cloudpool-config
+              key: redis-host
+        
+        - name: WEAVIATE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: cloudpool-config
+              key: weaviate-url
+        
+        - name: RABBITMQ_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: cloudpool-config
+              key: rabbitmq-host
+        
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: cloudpool-secrets
+              key: jwt-secret
+        
+        - name: GOOGLE_DRIVE_CLIENT_ID
+          valueFrom:
+            secretKeyRef:
+              name: cloudpool-secrets
+              key: google-drive-client-id
+        
+        - name: GOOGLE_DRIVE_CLIENT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: cloudpool-secrets
+              key: google-drive-client-secret
+        
+        - name: OPENAI_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: cloudpool-secrets
+              key: openai-api-key
+
+        livenessProbe:
+          httpGet:
+            path: /actuator/health
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+
+        readinessProbe:
+          httpGet:
+            path: /actuator/health/readiness
+            port: http
+          initialDelaySeconds: 20
+          periodSeconds: 5
+          timeoutSeconds: 5
+          failureThreshold: 3
+
+        resources:
+          requests:
+            cpu: 500m
+            memory: 512Mi
+          limits:
+            cpu: 2000m
+            memory: 2Gi
+
+        volumeMounts:
+        - name: logs
+          mountPath: /var/log/cloudpool
+        - name: config
+          mountPath: /etc/cloudpool
+
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 1000
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+
+      volumes:
+      - name: logs
+        emptyDir: {}
+      - name: config
+        configMap:
+          name: cloudpool-config
+
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - cloudpool-api
+              topologyKey: kubernetes.io/hostname
+
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0

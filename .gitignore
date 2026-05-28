@@ -24,3 +24,6 @@ apache-maven-*/
 # Build
 build/
 dist/
+
+# Local Storage
+backend/spring-boot/storage/

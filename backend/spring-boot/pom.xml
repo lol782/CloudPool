@@ -71,6 +71,11 @@
             <artifactId>spring-boot-starter-actuator</artifactId>
         </dependency>
 
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-websocket</artifactId>
+        </dependency>
+
         <!-- GraphQL -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -176,6 +181,12 @@
             <artifactId>jackson-databind</artifactId>
         </dependency>
 
+        <dependency>
+            <groupId>net.logstash.logback</groupId>
+            <artifactId>logstash-logback-encoder</artifactId>
+            <version>7.4</version>
+        </dependency>
+
         <!-- Monitoring & Metrics -->
         <dependency>
             <groupId>io.micrometer</groupId>
@@ -207,6 +218,12 @@
         </dependency>
 
         <dependency>
+            <groupId>org.springframework.graphql</groupId>
+            <artifactId>spring-graphql-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
             <groupId>org.springframework.security</groupId>
             <artifactId>spring-security-test</artifactId>
             <scope>test</scope>
@@ -215,6 +232,13 @@
         <dependency>
             <groupId>io.rest-assured</groupId>
             <artifactId>rest-assured</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>io.gatling.highcharts</groupId>
+            <artifactId>gatling-charts-highcharts</artifactId>
+            <version>3.9.5</version>
             <scope>test</scope>
         </dependency>
     </dependencies>
@@ -262,6 +286,15 @@
                     <url>jdbc:postgresql://localhost:5432/cloudpool</url>
                     <user>cloudpool</user>
                     <password>cloudpool</password>
+                </configuration>
+            </plugin>
+
+            <plugin>
+                <groupId>io.gatling</groupId>
+                <artifactId>gatling-maven-plugin</artifactId>
+                <version>4.3.0</version>
+                <configuration>
+                    <simulationClass>com.cloudpool.performance.CloudPoolSimulation</simulationClass>
                 </configuration>
             </plugin>
         </plugins>

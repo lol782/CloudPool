@@ -1,0 +1,31 @@
+groups:
+  - name: cloudpool
+    interval: 30s
+    rules:
+      - alert: HighErrorRate
+        expr: rate(http_requests_total{status=~"5.."}[5m]) > 0.05
+        for: 5m
+        annotations:
+          summary: "High error rate detected"
+          description: "Error rate is above 5%"
+
+      - alert: LowAvailableStorage
+        expr: cloudpool_storage_available_bytes < 1073741824
+        for: 10m
+        annotations:
+          summary: "Low storage space"
+          description: "Available storage is below 1GB"
+
+      - alert: HighDatabaseConnectionPoolUsage
+        expr: db_active_connections / db_max_connections > 0.8
+        for: 5m
+        annotations:
+          summary: "High database connection usage"
+          description: "Database connection pool usage is above 80%"
+
+      - alert: HighCacheMemoryUsage
+        expr: redis_memory_used_bytes / redis_memory_max_bytes > 0.9
+        for: 5m
+        annotations:
+          summary: "High cache memory usage"
+          description: "Redis memory usage is above 90%"
