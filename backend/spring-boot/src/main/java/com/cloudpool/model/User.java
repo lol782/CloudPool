@@ -13,7 +13,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-@JsonIgnoreProperties({"hibernateLazyInitializer", "handler", "passwordHash", "googleAccessToken", "googleRefreshToken"})
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler", "passwordHash", "googleAccessToken", "googleRefreshToken", "customClientId", "customClientSecret"})
 public class User {
 
     @Id
@@ -44,6 +44,18 @@ public class User {
     private String googleRefreshToken;
 
     private LocalDateTime googleTokenExpiresAt;
+
+    @Column(length = 500)
+    private String customClientId;
+
+    @Column(length = 500)
+    private String customClientSecret;
+
+    @Builder.Default
+    private long currentUsage = 0L;
+
+    @Builder.Default
+    private long storageQuota = 5368709120L; // 5GB default
 
     @Builder.Default
     private LocalDateTime createdAt = LocalDateTime.now();
