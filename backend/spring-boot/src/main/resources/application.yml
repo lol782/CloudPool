@@ -40,6 +40,18 @@ spring:
       enabled: true
       path: /graphiql
 
+  # RabbitMQ listener retry policy & DLQ routing
+  rabbitmq:
+    listener:
+      simple:
+        retry:
+          enabled: true
+          max-attempts: 3
+          initial-interval: 2000ms
+          multiplier: 2.0
+          max-interval: 10000ms
+        default-requeue-rejected: false
+
 # Logging Configuration
 logging:
   level:
