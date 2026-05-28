@@ -9,7 +9,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    
+
     services:
       postgres:
         image: postgres:15-alpine
@@ -24,7 +24,7 @@ jobs:
           --health-retries 5
         ports:
           - 5432:5432
-      
+
       redis:
         image: redis:7-alpine
         options: >-
@@ -35,39 +35,59 @@ jobs:
         ports:
           - 6379:6379
 
+      rabbitmq:
+        image: rabbitmq:3-alpine
+        options: >-
+          --health-cmd "rabbitmq-diagnostics ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5672:5672
+
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
 
     - name: Set up JDK 17
-      uses: actions/setup-java@v3
+      uses: actions/setup-java@v4
       with:
         java-version: '17'
         distribution: 'temurin'
         cache: maven
 
     - name: Run tests
-      run: mvn clean test
+      working-directory: backend/spring-boot
+      run: mvn clean test -Dspring.profiles.active=ci
       env:
-        DATABASE_URL: jdbc:postgresql://localhost:5432/cloudpool_test
-        DATABASE_USER: cloudpool
-        DATABASE_PASSWORD: password
-        REDIS_HOST: localhost
+        SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/cloudpool_test
+        SPRING_DATASOURCE_USERNAME: cloudpool
+        SPRING_DATASOURCE_PASSWORD: password
+        SPRING_REDIS_HOST: localhost
+        SPRING_REDIS_PORT: 6379
+        SPRING_RABBITMQ_HOST: localhost
+        SPRING_RABBITMQ_PORT: 5672
+        CLOUDPOOL_JWT_SECRET: ci-test-secret-key-minimum-32-chars-long
+        CLOUDPOOL_GOOGLE_DRIVE_CLIENT_ID: dummy-client-id
+        CLOUDPOOL_GOOGLE_DRIVE_CLIENT_SECRET: dummy-client-secret
 
     - name: Build with Maven
+      working-directory: backend/spring-boot
       run: mvn clean package -DskipTests
 
     - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v3
+      uses: codecov/codecov-action@v4
       with:
-        files: ./target/site/jacoco/jacoco.xml
+        files: backend/spring-boot/target/site/jacoco/jacoco.xml
+      continue-on-error: true   # Don't fail if Codecov token not configured
 
     - name: Build Docker image
       run: docker build -t cloudpool:${{ github.sha }} .
 
     - name: Push to Docker Registry
-      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      if: github.event_name == 'push' && github.ref == 'refs/heads/main' && secrets.DOCKER_USERNAME != ''
       run: |
         echo ${{ secrets.DOCKER_PASSWORD }} | docker login -u ${{ secrets.DOCKER_USERNAME }} --password-stdin
-        docker tag cloudpool:${{ github.sha }} cloudpool:latest
-        docker push cloudpool:${{ github.sha }}
-        docker push cloudpool:latest
+        docker tag cloudpool:${{ github.sha }} ${{ secrets.DOCKER_USERNAME }}/cloudpool:${{ github.sha }}
+        docker tag cloudpool:${{ github.sha }} ${{ secrets.DOCKER_USERNAME }}/cloudpool:latest
+        docker push ${{ secrets.DOCKER_USERNAME }}/cloudpool:${{ github.sha }}
+        docker push ${{ secrets.DOCKER_USERNAME }}/cloudpool:latest
