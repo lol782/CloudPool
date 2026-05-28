@@ -1,4 +1,5 @@
-CREATE TABLE users (
+-- V1: Complete initial schema (includes all columns through V4)
+CREATE TABLE IF NOT EXISTS users (
     id UUID PRIMARY KEY,
     email VARCHAR(255) UNIQUE NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
@@ -9,11 +10,15 @@ CREATE TABLE users (
     google_access_token VARCHAR(1000),
     google_refresh_token VARCHAR(1000),
     google_token_expires_at TIMESTAMP,
+    custom_client_id VARCHAR(500),
+    custom_client_secret VARCHAR(500),
+    current_usage BIGINT DEFAULT 0,
+    storage_quota BIGINT DEFAULT 5368709120,
     created_at TIMESTAMP NOT NULL,
     updated_at TIMESTAMP NOT NULL
 );
 
-CREATE TABLE projects (
+CREATE TABLE IF NOT EXISTS projects (
     id UUID PRIMARY KEY,
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     name VARCHAR(255) NOT NULL,
@@ -22,7 +27,7 @@ CREATE TABLE projects (
     updated_at TIMESTAMP NOT NULL
 );
 
-CREATE TABLE buckets (
+CREATE TABLE IF NOT EXISTS buckets (
     id UUID PRIMARY KEY,
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     name VARCHAR(255) NOT NULL,
@@ -32,7 +37,7 @@ CREATE TABLE buckets (
     updated_at TIMESTAMP NOT NULL
 );
 
-CREATE TABLE files (
+CREATE TABLE IF NOT EXISTS files (
     id UUID PRIMARY KEY,
     bucket_id UUID NOT NULL REFERENCES buckets(id) ON DELETE CASCADE,
     name VARCHAR(512) NOT NULL,
@@ -48,7 +53,7 @@ CREATE TABLE files (
     updated_at TIMESTAMP NOT NULL
 );
 
-CREATE TABLE file_shares (
+CREATE TABLE IF NOT EXISTS file_shares (
     id UUID PRIMARY KEY,
     file_id UUID NOT NULL,
     shared_with_email VARCHAR(255),
@@ -58,7 +63,7 @@ CREATE TABLE file_shares (
     created_at TIMESTAMP NOT NULL
 );
 
-CREATE TABLE developer_tables (
+CREATE TABLE IF NOT EXISTS developer_tables (
     id UUID PRIMARY KEY,
     user_id UUID NOT NULL,
     project_id UUID,
@@ -69,7 +74,7 @@ CREATE TABLE developer_tables (
     updated_at TIMESTAMP NOT NULL
 );
 
-CREATE TABLE developer_table_fields (
+CREATE TABLE IF NOT EXISTS developer_table_fields (
     id UUID PRIMARY KEY,
     table_id UUID NOT NULL REFERENCES developer_tables(id) ON DELETE CASCADE,
     field_name VARCHAR(255) NOT NULL,
@@ -77,7 +82,7 @@ CREATE TABLE developer_table_fields (
     is_required BOOLEAN DEFAULT false
 );
 
-CREATE TABLE database_connections (
+CREATE TABLE IF NOT EXISTS database_connections (
     id UUID PRIMARY KEY,
     project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
     db_type VARCHAR(50) NOT NULL,
@@ -90,7 +95,7 @@ CREATE TABLE database_connections (
     created_at TIMESTAMP NOT NULL
 );
 
-CREATE TABLE project_secrets (
+CREATE TABLE IF NOT EXISTS project_secrets (
     id UUID PRIMARY KEY,
     project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
     secret_key VARCHAR(255) NOT NULL,
@@ -98,7 +103,7 @@ CREATE TABLE project_secrets (
     created_at TIMESTAMP NOT NULL
 );
 
-CREATE TABLE project_snapshots (
+CREATE TABLE IF NOT EXISTS project_snapshots (
     id UUID PRIMARY KEY,
     project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
     name VARCHAR(255) NOT NULL,
@@ -106,7 +111,7 @@ CREATE TABLE project_snapshots (
     created_at TIMESTAMP NOT NULL
 );
 
-CREATE TABLE api_keys (
+CREATE TABLE IF NOT EXISTS api_keys (
     id UUID PRIMARY KEY,
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     name VARCHAR(255) NOT NULL,
@@ -118,7 +123,7 @@ CREATE TABLE api_keys (
     expires_at TIMESTAMP
 );
 
-CREATE TABLE audit_logs (
+CREATE TABLE IF NOT EXISTS audit_logs (
     id UUID PRIMARY KEY,
     user_id UUID REFERENCES users(id) ON DELETE SET NULL,
     action VARCHAR(100) NOT NULL,
@@ -130,7 +135,7 @@ CREATE TABLE audit_logs (
     created_at TIMESTAMP NOT NULL
 );
 
-CREATE TABLE vector_collections (
+CREATE TABLE IF NOT EXISTS vector_collections (
     id UUID PRIMARY KEY,
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     name VARCHAR(255) NOT NULL,
@@ -141,7 +146,7 @@ CREATE TABLE vector_collections (
     updated_at TIMESTAMP NOT NULL
 );
 
-CREATE TABLE vector_documents (
+CREATE TABLE IF NOT EXISTS vector_documents (
     id UUID PRIMARY KEY,
     collection_id UUID NOT NULL REFERENCES vector_collections(id) ON DELETE CASCADE,
     doc_id VARCHAR(255) NOT NULL,
