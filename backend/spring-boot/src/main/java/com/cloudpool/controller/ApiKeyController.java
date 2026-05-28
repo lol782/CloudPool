@@ -1,8 +1,10 @@
 package com.cloudpool.controller;
 
+import com.cloudpool.dto.ApiKeyUsageLogDto;
 import com.cloudpool.model.ApiKey;
 import com.cloudpool.model.User;
 import com.cloudpool.repository.ApiKeyRepository;
+import com.cloudpool.service.ApiKeyUsageService;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -22,6 +24,7 @@ import java.util.*;
 public class ApiKeyController {
 
     private final ApiKeyRepository apiKeyRepository;
+    private final ApiKeyUsageService apiKeyUsageService;
 
     private User getAuthenticatedUser() {
         return (User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
@@ -64,6 +67,45 @@ public class ApiKeyController {
         response.put("expiresAt", saved.getExpiresAt());
 
         return ResponseEntity.ok(response);
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<?> deleteKey(@PathVariable UUID id) {
+        User user = getAuthenticatedUser();
+        Optional<ApiKey> keyOpt = apiKeyRepository.findById(id);
+        if (keyOpt.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        ApiKey key = keyOpt.get();
+        if (!key.getUser().getId().equals(user.getId())) {
+            return ResponseEntity.status(403).body(Map.of("error", "Access denied"));
+        }
+        apiKeyRepository.delete(key);
+        return ResponseEntity.ok(Map.of("message", "API key deleted successfully"));
+    }
+
+    @GetMapping("/analytics/logs")
+    public ResponseEntity<List<ApiKeyUsageLogDto>> getAnalyticsLogs() {
+        User user = getAuthenticatedUser();
+        return ResponseEntity.ok(apiKeyUsageService.getLogsForUser(user));
+    }
+
+    @GetMapping("/analytics/by-key")
+    public ResponseEntity<List<Map<String, Object>>> getAnalyticsByKey() {
+        User user = getAuthenticatedUser();
+        return ResponseEntity.ok(apiKeyUsageService.getUsageByKey(user));
+    }
+
+    @GetMapping("/analytics/by-status")
+    public ResponseEntity<List<Map<String, Object>>> getAnalyticsByStatus() {
+        User user = getAuthenticatedUser();
+        return ResponseEntity.ok(apiKeyUsageService.getUsageByStatus(user));
+    }
+
+    @GetMapping("/analytics/by-endpoint")
+    public ResponseEntity<List<Map<String, Object>>> getAnalyticsByEndpoint() {
+        User user = getAuthenticatedUser();
+        return ResponseEntity.ok(apiKeyUsageService.getUsageByEndpoint(user));
     }
 
     private String generateRandomString(int length) {
