@@ -62,3 +62,36 @@ Follow Conventional Commits:
 - `test:`: Adding or updating tests.
 - `refactor:`: Code refactor without interface changes.
 - `chore:`: Dependencies updates or build script modifications.
+
+---
+
+## Pull Request Process
+
+1. Update documentation for any new or changed functionality.
+2. Add unit and/or integration tests for your changes.
+3. Ensure all tests pass locally (`mvn clean test`).
+4. Update `CHANGELOG.md` with a summary of your changes.
+5. Request review from at least two maintainers.
+
+---
+
+## Code Review Process
+
+- Minimum **2 approvals** are required before merging.
+- All CI checks must pass (build, test, lint).
+- Code coverage must not decrease below the project threshold.
+
+---
+
+## Questions?
+
+- Open an issue on GitHub for bugs or feature requests.
+- Discuss ideas in our community forum.
+- Contact maintainers directly for security-related issues.
+
+---
+
+## License
+
+By contributing to CloudPool, you agree that your contributions will be licensed under the [Apache License 2.0](../LICENSE).
+
