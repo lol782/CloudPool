@@ -5,24 +5,32 @@ import com.cloudpool.model.BackgroundJob;
 import com.cloudpool.repository.BackgroundJobRepository;
 import com.cloudpool.config.RabbitMQConfig;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 @Slf4j
 @Service
-@RequiredArgsConstructor
 @Transactional
 public class BackgroundJobService {
 
     private final BackgroundJobRepository jobRepository;
     private final RabbitTemplate rabbitTemplate;
     private final ObjectMapper objectMapper;
+
+    public BackgroundJobService(
+            BackgroundJobRepository jobRepository,
+            Optional<RabbitTemplate> rabbitTemplate,
+            ObjectMapper objectMapper) {
+        this.jobRepository = jobRepository;
+        this.rabbitTemplate = rabbitTemplate.orElse(null);
+        this.objectMapper = objectMapper;
+    }
 
     /**
      * Submit file processing job
@@ -54,11 +62,15 @@ public class BackgroundJobService {
         BackgroundJob saved = jobRepository.save(job);
 
         // Send to queue
-        rabbitTemplate.convertAndSend(
-            RabbitMQConfig.EXCHANGE,
-            "cloudpool.file.processing",
-            saved.getId().toString()
-        );
+        if (rabbitTemplate != null) {
+            rabbitTemplate.convertAndSend(
+                RabbitMQConfig.EXCHANGE,
+                "cloudpool.file.processing",
+                saved.getId().toString()
+            );
+        } else {
+            log.warn("RabbitMQ is not configured. Job {} remains PENDING.", saved.getId());
+        }
 
         return BackgroundJobDTO.fromEntity(saved);
     }
@@ -95,11 +107,15 @@ public class BackgroundJobService {
         BackgroundJob saved = jobRepository.save(job);
 
         // Send to queue
-        rabbitTemplate.convertAndSend(
-            RabbitMQConfig.EXCHANGE,
-            "cloudpool.embedding.generate",
-            saved.getId().toString()
-        );
+        if (rabbitTemplate != null) {
+            rabbitTemplate.convertAndSend(
+                RabbitMQConfig.EXCHANGE,
+                "cloudpool.embedding.generate",
+                saved.getId().toString()
+            );
+        } else {
+            log.warn("RabbitMQ is not configured. Job {} remains PENDING.", saved.getId());
+        }
 
         return BackgroundJobDTO.fromEntity(saved);
     }
