@@ -4,10 +4,13 @@ target/
 # Logs
 logs/
 *.log
+LOG_PATH_IS_UNDEFINED/
 
 # Database
 *.db
 *.mv.db
+*.trace.db
+data/
 
 # Secrets
 *.json
