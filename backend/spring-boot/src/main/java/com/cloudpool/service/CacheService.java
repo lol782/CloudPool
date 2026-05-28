@@ -88,4 +88,26 @@ public class CacheService {
             log.info("All caches cleared");
         }
     }
+
+    /**
+     * Blacklist a JWT token using Redis (or fallback locally if template is null)
+     */
+    public void blacklistToken(String token, long expirationMs) {
+        if (redisTemplate != null) {
+            String key = "blacklist:" + token;
+            redisTemplate.opsForValue().set(key, "revoked", expirationMs, TimeUnit.MILLISECONDS);
+            log.info("Token added to Redis blacklist");
+        }
+    }
+
+    /**
+     * Check if a JWT token is blacklisted
+     */
+    public boolean isTokenBlacklisted(String token) {
+        if (redisTemplate != null) {
+            String key = "blacklist:" + token;
+            return Boolean.TRUE.equals(redisTemplate.hasKey(key));
+        }
+        return false;
+    }
 }
