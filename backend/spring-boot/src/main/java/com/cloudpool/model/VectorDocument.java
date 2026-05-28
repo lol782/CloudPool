@@ -29,7 +29,7 @@ public class VectorDocument {
     @Column(columnDefinition = "TEXT")
     private String content;
 
-    @Lob
+    @Column(columnDefinition = "BYTEA")
     private byte[] embeddingVector; // Serialized float array for local fallback
 
     @Column(columnDefinition = "TEXT")
