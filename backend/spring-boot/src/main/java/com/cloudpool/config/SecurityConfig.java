@@ -25,6 +25,7 @@ import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final com.cloudpool.filter.LoginRateLimiterFilter loginRateLimiterFilter;
 
     @Bean
     public PasswordEncoder passwordEncoder() {
@@ -52,6 +53,7 @@ public class SecurityConfig {
                 .anyRequest().authenticated()
             )
             .headers(headers -> headers.frameOptions(frame -> frame.disable()))
+            .addFilterBefore(loginRateLimiterFilter, UsernamePasswordAuthenticationFilter.class)
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
             .addFilterAfter(new TenantFilter(), JwtAuthenticationFilter.class);
         return http.build();
