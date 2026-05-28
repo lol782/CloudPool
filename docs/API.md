@@ -210,3 +210,54 @@ mutation {
   }
 }
 ```
+
+---
+
+## ⚠️ Error Handling
+
+All errors follow a consistent JSON format:
+
+```json
+{
+  "success": false,
+  "error": {
+    "code": "FILE_NOT_FOUND",
+    "message": "File not found",
+    "details": "File with ID 123 not found"
+  }
+}
+```
+
+### Error Codes
+
+| HTTP Code | Meaning |
+|-----------|---------|
+| `400` | Bad Request — Invalid parameters or malformed request body |
+| `401` | Unauthorized — Missing or invalid authentication token |
+| `403` | Forbidden — Insufficient permissions for the requested resource |
+| `404` | Not Found — Resource does not exist |
+| `409` | Conflict — Resource already exists or state conflict |
+| `413` | Payload Too Large — File exceeds the maximum upload size |
+| `429` | Too Many Requests — Rate limit exceeded |
+| `500` | Internal Server Error — Unexpected server-side failure |
+
+---
+
+## 🚦 Rate Limiting
+
+Rate limits are applied per authenticated user:
+
+| Limit | Value |
+|-------|-------|
+| API calls per minute | 100 |
+| Concurrent file uploads | 5 |
+
+Rate limit status is returned in response headers:
+
+```
+X-RateLimit-Limit: 100
+X-RateLimit-Remaining: 95
+X-RateLimit-Reset: 1705318200
+```
+
+When the rate limit is exceeded, the API returns a `429 Too Many Requests` response with a `Retry-After` header indicating how many seconds to wait before retrying.
