@@ -3,14 +3,28 @@ name: Deploy to Kubernetes
 on:
   push:
     branches: [ main ]
+  workflow_dispatch:  # Allow manual trigger from GitHub UI
 
 jobs:
+  check-secrets:
+    runs-on: ubuntu-latest
+    outputs:
+      has-kubeconfig: ${{ steps.check.outputs.has-kubeconfig }}
+    steps:
+      - name: Check if KUBECONFIG secret is configured
+        id: check
+        run: |
+          if [ -n "${{ secrets.KUBECONFIG }}" ]; then
+            echo "has-kubeconfig=true" >> $GITHUB_OUTPUT
+          else
+            echo "has-kubeconfig=false" >> $GITHUB_OUTPUT
+            echo "::notice::KUBECONFIG secret is not set - skipping Kubernetes deploy"
+          fi
+
   deploy:
     runs-on: ubuntu-latest
-    # Only run if KUBECONFIG secret is configured — skip silently otherwise
-    if: ${{ secrets.KUBECONFIG != '' }}
-
-    needs: []   # Can wire to 'build' job after Docker registry is set up
+    needs: check-secrets
+    if: needs.check-secrets.outputs.has-kubeconfig == 'true'
 
     steps:
     - uses: actions/checkout@v4
