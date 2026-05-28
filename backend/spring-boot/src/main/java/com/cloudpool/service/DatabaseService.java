@@ -57,6 +57,9 @@ public class DatabaseService {
     @Transactional
     public DevTable createTable(UUID userId, UUID projectId, String name, String displayName, String description, List<FieldRequest> fields) {
         // Validate table name
+        if (name == null || name.trim().isEmpty()) {
+            throw new IllegalArgumentException("Table name cannot be null or empty.");
+        }
         String cleanName = name.trim().toLowerCase();
         if (!IDENTIFIER_PATTERN.matcher(cleanName).matches()) {
             throw new IllegalArgumentException("Invalid table name. Only alphanumeric characters and underscores are allowed, starting with a letter.");
@@ -79,6 +82,16 @@ public class DatabaseService {
         List<FieldRequest> validatedFields = new ArrayList<>();
         Set<String> fieldNames = new HashSet<>();
         for (FieldRequest field : fields) {
+            if (field == null) {
+                throw new IllegalArgumentException("Field schema cannot be null.");
+            }
+            if (field.getFieldName() == null || field.getFieldName().trim().isEmpty()) {
+                throw new IllegalArgumentException("Field name cannot be null or empty.");
+            }
+            if (field.getFieldType() == null || field.getFieldType().trim().isEmpty()) {
+                throw new IllegalArgumentException("Field type cannot be null or empty.");
+            }
+
             String fieldName = field.getFieldName().trim().toLowerCase();
             if (!IDENTIFIER_PATTERN.matcher(fieldName).matches()) {
                 throw new IllegalArgumentException("Invalid field name '" + field.getFieldName() + "'. Only alphanumeric characters and underscores are allowed.");
