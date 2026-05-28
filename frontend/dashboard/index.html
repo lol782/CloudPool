@@ -833,6 +833,21 @@
 <script>
   const API_BASE = window.location.protocol === 'file:' ? 'http://localhost:8080' : '';
 
+  // Intercept all fetch responses to auto-logout on 401/403 (unauthorized/forbidden)
+  const originalFetch = window.fetch;
+  window.fetch = async function(...args) {
+    try {
+      const res = await originalFetch(...args);
+      const url = args[0] ? args[0].toString() : '';
+      if ((res.status === 401 || res.status === 403) && !url.includes('/api/auth/')) {
+        logout();
+      }
+      return res;
+    } catch (err) {
+      throw err;
+    }
+  };
+
   function getToken() {
     return localStorage.getItem("cp_token");
   }
