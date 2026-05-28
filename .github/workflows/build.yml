@@ -56,5 +56,18 @@ jobs:
     - name: Build with Maven
       run: mvn clean package -DskipTests
 
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        files: ./target/site/jacoco/jacoco.xml
+
     - name: Build Docker image
       run: docker build -t cloudpool:${{ github.sha }} .
+
+    - name: Push to Docker Registry
+      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      run: |
+        echo ${{ secrets.DOCKER_PASSWORD }} | docker login -u ${{ secrets.DOCKER_USERNAME }} --password-stdin
+        docker tag cloudpool:${{ github.sha }} cloudpool:latest
+        docker push cloudpool:${{ github.sha }}
+        docker push cloudpool:latest
