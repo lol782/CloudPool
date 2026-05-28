@@ -40,37 +40,71 @@ public class EmbeddingService {
             return generateMockEmbedding(text);
         }
 
-        try {
-            String url = "https://api.openai.com/v1/embeddings";
+        int maxRetries = 3;
+        int attempt = 0;
+        long backoffMs = 1000;
 
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
-            headers.setBearerAuth(apiKey);
+        while (attempt < maxRetries) {
+            try {
+                String url = "https://api.openai.com/v1/embeddings";
 
-            Map<String, Object> body = new HashMap<>();
-            body.put("input", text);
-            body.put("model", model);
+                HttpHeaders headers = new HttpHeaders();
+                headers.setContentType(MediaType.APPLICATION_JSON);
+                headers.setBearerAuth(apiKey);
 
-            HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, headers);
-            ResponseEntity<String> response = restTemplate.postForEntity(url, entity, String.class);
+                Map<String, Object> body = new HashMap<>();
+                body.put("input", text);
+                body.put("model", model);
 
-            if (response.getStatusCode().is2xxSuccessful()) {
-                JsonNode root = objectMapper.readTree(response.getBody());
-                JsonNode embeddingNode = root.path("data").get(0).path("embedding");
-                
-                float[] vector = new float[embeddingNode.size()];
-                for (int i = 0; i < embeddingNode.size(); i++) {
-                    vector[i] = (float) embeddingNode.get(i).asDouble();
+                HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, headers);
+                ResponseEntity<String> response = restTemplate.postForEntity(url, entity, String.class);
+
+                if (response.getStatusCode().is2xxSuccessful()) {
+                    JsonNode root = objectMapper.readTree(response.getBody());
+                    JsonNode embeddingNode = root.path("data").get(0).path("embedding");
+                    
+                    float[] vector = new float[embeddingNode.size()];
+                    for (int i = 0; i < embeddingNode.size(); i++) {
+                        vector[i] = (float) embeddingNode.get(i).asDouble();
+                    }
+                    return vector;
+                } else {
+                    int statusCode = response.getStatusCode().value();
+                    if (statusCode == 429 || statusCode == 503 || statusCode >= 500) {
+                        attempt++;
+                        if (attempt >= maxRetries) {
+                            throw new RuntimeException("Failed to fetch embedding: HTTP status " + statusCode);
+                        }
+                        log.warn("Transient error from OpenAI (HTTP {}), retrying attempt {}/{} in {} ms...",
+                                statusCode, attempt, maxRetries, backoffMs);
+                        Thread.sleep(backoffMs);
+                        backoffMs *= 2;
+                    } else {
+                        throw new RuntimeException("Failed to fetch embedding: HTTP status " + response.getStatusCode());
+                    }
                 }
-                return vector;
-            } else {
-                log.error("Failed to fetch embedding: HTTP status {}", response.getStatusCode());
-                return generateMockEmbedding(text);
+            } catch (Exception e) {
+                if (e instanceof InterruptedException) {
+                    Thread.currentThread().interrupt();
+                    throw new RuntimeException("Embedding generation interrupted", e);
+                }
+                attempt++;
+                if (attempt >= maxRetries) {
+                    log.error("Failed to generate embedding after {} attempts: {}", maxRetries, e.getMessage());
+                    throw new RuntimeException("Error generating embedding from OpenAI: " + e.getMessage(), e);
+                }
+                log.warn("Error calling OpenAI (attempt {}/{}), retrying in {} ms: {}",
+                        attempt, maxRetries, backoffMs, e.getMessage());
+                try {
+                    Thread.sleep(backoffMs);
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    throw new RuntimeException(ie);
+                }
+                backoffMs *= 2;
             }
-        } catch (Exception e) {
-            log.error("Error generating embedding from OpenAI: {}", e.getMessage());
-            return generateMockEmbedding(text);
         }
+        return generateMockEmbedding(text);
     }
 
     private float[] generateMockEmbedding(String text) {
