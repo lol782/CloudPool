@@ -1,0 +1,4 @@
+ALTER TABLE users ADD COLUMN custom_client_id VARCHAR(500);
+ALTER TABLE users ADD COLUMN custom_client_secret VARCHAR(500);
+ALTER TABLE users ADD COLUMN current_usage BIGINT DEFAULT 0;
+ALTER TABLE users ADD COLUMN storage_quota BIGINT DEFAULT 5368709120;
