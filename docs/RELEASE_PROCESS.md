@@ -44,6 +44,17 @@ We follow Semantic Versioning: `MAJOR.MINOR.PATCH`
    docker push cloudpool:0.1.0
    ```
 
+7. **Create GitHub Release**
+   - Navigate to **Releases** on the GitHub repository page.
+   - Click **Draft a new release** and select the tag you just pushed.
+   - Add detailed release notes summarizing new features, bug fixes, and breaking changes.
+   - Attach any build artifacts (JAR files, Docker image digests).
+
+8. **Announce Release**
+   - Post on community forums and discussion channels.
+   - Update the project documentation site with the new version.
+   - Send a newsletter to subscribed users and contributors.
+
 ---
 
 ## Rollback Process
