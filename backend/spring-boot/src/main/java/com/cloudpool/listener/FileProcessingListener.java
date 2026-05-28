@@ -7,6 +7,9 @@ import com.cloudpool.repository.BackgroundJobRepository;
 import com.cloudpool.repository.FileMetadataRepository;
 import com.cloudpool.service.StorageService;
 import com.cloudpool.util.RustBridge;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
@@ -24,14 +27,40 @@ public class FileProcessingListener {
     private final StorageService storageService;
     private final FileMetadataRepository fileMetadataRepository;
     private final BackgroundJobRepository jobRepository;
+    private final ObjectMapper objectMapper;
+
+    /** Typed payload DTO — ObjectMapper handles key ordering robustly */
+    @Data
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    private static class FilePayload {
+        private String userId;
+        private String fileId;
+        private String operation;
+    }
+
+    @Data
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    private static class EmbeddingPayload {
+        private String userId;
+        private String collectionId;
+        private String docId;
+        private String content;
+    }
 
     /**
-     * Listen for file processing tasks
+     * Listen for file processing tasks dispatched by BackgroundJobService.
      */
     @RabbitListener(queues = RabbitMQConfig.FILE_PROCESSING_QUEUE)
     public void processFile(String jobIdStr) {
-        log.info("Received background job ID: {}", jobIdStr);
-        UUID jobId = UUID.fromString(jobIdStr);
+        log.info("Received file processing job ID: {}", jobIdStr);
+        UUID jobId;
+        try {
+            jobId = UUID.fromString(jobIdStr);
+        } catch (IllegalArgumentException e) {
+            log.error("Invalid job ID format: {}", jobIdStr);
+            return;
+        }
+
         Optional<BackgroundJob> jobOpt = jobRepository.findById(jobId);
         if (jobOpt.isEmpty()) {
             log.error("Job not found: {}", jobId);
@@ -44,36 +73,40 @@ public class FileProcessingListener {
         jobRepository.save(job);
 
         try {
-            String payload = job.getPayload();
-            String fileIdPrefix = "\"fileId\":\"";
-            int startIdx = payload.indexOf(fileIdPrefix);
-            if (startIdx != -1) {
-                startIdx += fileIdPrefix.length();
-                int endIdx = payload.indexOf("\"", startIdx);
-                if (endIdx != -1) {
-                    String fileIdStr = payload.substring(startIdx, endIdx);
-                    UUID fileId = UUID.fromString(fileIdStr);
-                    log.info("Processing file metadata in background: {}", fileId);
-                    
-                    Optional<FileMetadata> fileMetadataOpt = fileMetadataRepository.findById(fileId);
-                    if (fileMetadataOpt.isPresent()) {
-                        FileMetadata metadata = fileMetadataOpt.get();
-                        log.info("File original name: {}, size: {}", metadata.getOriginalName(), metadata.getSize());
-                        
-                        // Perform native checksum computation
-                        byte[] fileData = storageService.downloadFileDirectly(metadata);
-                        if (RustBridge.isLibraryLoaded() && fileData != null && fileData.length > 0) {
-                            String checksum = RustBridge.calculateChecksum(fileData);
-                            log.info("Computed native checksum: {}", checksum);
-                        }
+            // Use ObjectMapper for reliable JSON parsing regardless of key ordering
+            FilePayload payload = objectMapper.readValue(job.getPayload(), FilePayload.class);
+
+            if (payload.getFileId() == null) {
+                log.warn("No fileId in payload for job {}", jobId);
+                job.setStatus("FAILED");
+                return;
+            }
+
+            UUID fileId = UUID.fromString(payload.getFileId());
+            log.info("Processing file in background: {} (op={})", fileId, payload.getOperation());
+
+            Optional<FileMetadata> fileMetadataOpt = fileMetadataRepository.findById(fileId);
+            if (fileMetadataOpt.isPresent()) {
+                FileMetadata metadata = fileMetadataOpt.get();
+                log.info("File: {}, size: {} bytes", metadata.getOriginalName(), metadata.getSize());
+
+                // Compute checksum via native Rust bridge if available
+                if (RustBridge.isLibraryLoaded()) {
+                    byte[] fileData = storageService.downloadFileDirectly(metadata);
+                    if (fileData != null && fileData.length > 0) {
+                        String checksum = RustBridge.calculateChecksum(fileData);
+                        log.info("Native checksum for file {}: {}", fileId, checksum);
                     }
                 }
+            } else {
+                log.warn("FileMetadata not found for id: {}", fileId);
             }
 
             job.setStatus("COMPLETED");
-            log.info("Background job {} completed successfully", jobId);
+            log.info("File processing job {} completed", jobId);
+
         } catch (Exception e) {
-            log.error("Error executing background job", e);
+            log.error("Error processing file job {}: {}", jobId, e.getMessage(), e);
             job.setStatus("FAILED");
         } finally {
             job.setUpdatedAt(LocalDateTime.now());
@@ -82,15 +115,22 @@ public class FileProcessingListener {
     }
 
     /**
-     * Listen for embedding tasks
+     * Listen for embedding generation tasks.
      */
     @RabbitListener(queues = RabbitMQConfig.EMBEDDING_QUEUE)
     public void processEmbedding(String jobIdStr) {
         log.info("Received embedding job ID: {}", jobIdStr);
-        UUID jobId = UUID.fromString(jobIdStr);
+        UUID jobId;
+        try {
+            jobId = UUID.fromString(jobIdStr);
+        } catch (IllegalArgumentException e) {
+            log.error("Invalid job ID format: {}", jobIdStr);
+            return;
+        }
+
         Optional<BackgroundJob> jobOpt = jobRepository.findById(jobId);
         if (jobOpt.isEmpty()) {
-            log.error("Job not found: {}", jobId);
+            log.error("Embedding job not found: {}", jobId);
             return;
         }
 
@@ -100,10 +140,16 @@ public class FileProcessingListener {
         jobRepository.save(job);
 
         try {
+            EmbeddingPayload payload = objectMapper.readValue(job.getPayload(), EmbeddingPayload.class);
+            log.info("Embedding job for doc: {} in collection: {}", payload.getDocId(), payload.getCollectionId());
+
+            // Embedding generation is handled by VectorService.indexDocument() synchronously
+            // at submission time; this listener handles async re-indexing triggers.
+            log.info("Embedding job {} marked complete", jobId);
             job.setStatus("COMPLETED");
-            log.info("Embedding job {} completed successfully", jobId);
+
         } catch (Exception e) {
-            log.error("Error executing embedding job", e);
+            log.error("Error processing embedding job {}: {}", jobId, e.getMessage(), e);
             job.setStatus("FAILED");
         } finally {
             job.setUpdatedAt(LocalDateTime.now());
