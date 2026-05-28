@@ -222,6 +222,78 @@ public class VectorService {
         }
 
         float[] queryEmbedding = embeddingService.generateEmbedding(query);
+
+        // ── Primary: Weaviate ANN search (O(log N)) ────────────────────────
+        try {
+            String className = sanitizeClassName(collection.getName());
+            Float[] wrapperEmbedding = new Float[queryEmbedding.length];
+            for (int i = 0; i < queryEmbedding.length; i++) wrapperEmbedding[i] = queryEmbedding[i];
+
+            var gqlResult = weaviateClient.graphQL().get()
+                    .withClassName(className)
+                    .withFields(
+                        io.weaviate.client.v1.graphql.query.fields.Field.builder().name("docId").build(),
+                        io.weaviate.client.v1.graphql.query.fields.Field.builder().name("content").build(),
+                        io.weaviate.client.v1.graphql.query.fields.Field.builder().name("metadata").build(),
+                        io.weaviate.client.v1.graphql.query.fields.Field.builder()
+                            .name("_additional")
+                            .fields(
+                                io.weaviate.client.v1.graphql.query.fields.Field.builder().name("certainty").build()
+                            ).build()
+                    )
+                    .withNearVector(
+                        io.weaviate.client.v1.graphql.query.argument.NearVectorArgument.builder()
+                            .vector(wrapperEmbedding)
+                            .certainty(0.6f)
+                            .build()
+                    )
+                    .withLimit(limit)
+                    .run();
+
+            if (!gqlResult.hasErrors() && gqlResult.getData() != null) {
+                @SuppressWarnings("unchecked")
+                var dataMap = (java.util.LinkedHashMap<String, Object>) gqlResult.getData();
+                @SuppressWarnings("unchecked")
+                var getMap = (java.util.LinkedHashMap<String, Object>) dataMap.get("Get");
+                if (getMap != null) {
+                    @SuppressWarnings("unchecked")
+                    var objects = (java.util.List<java.util.LinkedHashMap<String, Object>>) getMap.get(className);
+                    if (objects != null && !objects.isEmpty()) {
+                        List<Map<String, Object>> weaviateResults = new ArrayList<>();
+                        for (var obj : objects) {
+                            Map<String, Object> res = new HashMap<>();
+                            res.put("docId", obj.get("docId"));
+                            res.put("content", obj.get("content"));
+                            @SuppressWarnings("unchecked")
+                            var additional = (java.util.LinkedHashMap<String, Object>) obj.get("_additional");
+                            if (additional != null) {
+                                Object certainty = additional.get("certainty");
+                                res.put("score", certainty != null
+                                    ? Math.round(((Number) certainty).doubleValue() * 100.0) / 100.0 : 0.0);
+                            }
+                            Object metaRaw = obj.get("metadata");
+                            if (metaRaw instanceof String metaStr && !metaStr.isBlank()) {
+                                try { res.put("metadata", objectMapper.readValue(metaStr, Map.class)); }
+                                catch (Exception ignored) {}
+                            }
+                            weaviateResults.add(res);
+                        }
+                        log.info("Weaviate ANN search returned {} results for collection {}",
+                            weaviateResults.size(), collectionId);
+                        return weaviateResults;
+                    }
+                }
+            }
+            if (gqlResult.hasErrors()) {
+                log.warn("Weaviate errors: {}. Falling back to JPA cosine search.",
+                    gqlResult.getError().getMessages());
+            }
+        } catch (Exception e) {
+            log.warn("Weaviate unavailable ({}). Falling back to JPA cosine search.", e.getMessage());
+        }
+
+        // ── Fallback: JPA cosine similarity (O(N)) ─────────────────────────
+        log.info("JPA cosine fallback for collection {}", collectionId);
         List<VectorDocument> documents = documentRepository.findByCollectionId(collectionId);
         List<Map<String, Object>> results = new ArrayList<>();
 
@@ -243,10 +315,7 @@ public class VectorService {
         }
 
         results.sort((a, b) -> Double.compare((Double) b.get("score"), (Double) a.get("score")));
-        if (results.size() > limit) {
-            return results.subList(0, limit);
-        }
-        return results;
+        return results.size() > limit ? results.subList(0, limit) : results;
     }
 
     // ── MATH VECTOR UTILITIES ──
