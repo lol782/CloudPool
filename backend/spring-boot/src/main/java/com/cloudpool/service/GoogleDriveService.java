@@ -37,10 +37,25 @@ public class GoogleDriveService {
     @Value("${cloudpool.google-drive.redirect-uri:http://localhost:8080/oauth/callback}")
     private String redirectUri;
 
+    private String getClientIdForUser(User user) {
+        if (user != null && user.getCustomClientId() != null && !user.getCustomClientId().trim().isEmpty()) {
+            return user.getCustomClientId().trim();
+        }
+        return this.clientId;
+    }
+
+    private String getClientSecretForUser(User user) {
+        if (user != null && user.getCustomClientSecret() != null && !user.getCustomClientSecret().trim().isEmpty()) {
+            return user.getCustomClientSecret().trim();
+        }
+        return this.clientSecret;
+    }
+
     public String getAuthorizationUrl(User user) {
+        String effectiveClientId = getClientIdForUser(user);
         // Build OAuth Consent URL
         return "https://accounts.google.com/o/oauth2/auth?" +
-                "client_id=" + clientId +
+                "client_id=" + effectiveClientId +
                 "&redirect_uri=" + URLEncoder.encode(redirectUri, StandardCharsets.UTF_8) +
                 "&response_type=code" +
                 "&scope=" + URLEncoder.encode("https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/drive.metadata.readonly", StandardCharsets.UTF_8) +
@@ -51,14 +66,16 @@ public class GoogleDriveService {
 
     public void exchangeCodeForTokens(String code, User user) {
         String tokenUrl = "https://oauth2.googleapis.com/token";
+        String effectiveClientId = getClientIdForUser(user);
+        String effectiveClientSecret = getClientSecretForUser(user);
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
 
         MultiValueMap<String, String> map = new LinkedMultiValueMap<>();
         map.add("code", code);
-        map.add("client_id", clientId);
-        map.add("client_secret", clientSecret);
+        map.add("client_id", effectiveClientId);
+        map.add("client_secret", effectiveClientSecret);
         map.add("redirect_uri", redirectUri);
         map.add("grant_type", "authorization_code");
 
@@ -101,13 +118,15 @@ public class GoogleDriveService {
 
     private void refreshGoogleAccessToken(User user) {
         String tokenUrl = "https://oauth2.googleapis.com/token";
+        String effectiveClientId = getClientIdForUser(user);
+        String effectiveClientSecret = getClientSecretForUser(user);
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
 
         MultiValueMap<String, String> map = new LinkedMultiValueMap<>();
-        map.add("client_id", clientId);
-        map.add("client_secret", clientSecret);
+        map.add("client_id", effectiveClientId);
+        map.add("client_secret", effectiveClientSecret);
         map.add("refresh_token", user.getGoogleRefreshToken());
         map.add("grant_type", "refresh_token");
 
@@ -218,7 +237,7 @@ public class GoogleDriveService {
                 long limit = quota.path("limit").asLong();
                 long usage = quota.path("usage").asLong();
                 
-                Map<String, Long> result = new HashMap<>();
+                java.util.Map<String, Long> result = new java.util.HashMap<>();
                 result.put("limit", limit);
                 result.put("usage", usage);
                 return result;
@@ -227,5 +246,17 @@ public class GoogleDriveService {
             // Log warning
         }
         return null;
+    }
+
+    /**
+     * Validate a user's Google refresh token by attempting a token refresh.
+     */
+    public boolean validateRefreshToken(User user) {
+        try {
+            refreshGoogleAccessToken(user);
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
     }
 }
