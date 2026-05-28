@@ -109,13 +109,13 @@ public class DatabaseService {
                     ddl.append("VARCHAR(255)");
                     break;
                 case "TEXT":
-                    ddl.append("CLOB"); // H2 uses CLOB/TEXT, Postgres uses TEXT. CLOB is highly portable in H2.
+                    ddl.append("TEXT");
                     break;
                 case "INTEGER":
                     ddl.append("INTEGER");
                     break;
                 case "DOUBLE":
-                    ddl.append("DOUBLE PRECISION");
+                    ddl.append("DOUBLE");
                     break;
                 case "BOOLEAN":
                     ddl.append("BOOLEAN");
