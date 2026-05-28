@@ -28,11 +28,18 @@ public class StorageService {
     private final AuditLogRepository auditLogRepository;
     private final GoogleDriveService googleDriveService;
     private final FileShareRepository fileShareRepository;
+    private final QuotaService quotaService;
 
     @Value("${cloudpool.storage.local-dir:./storage}")
     private String localDir;
 
     public FileMetadata uploadFile(MultipartFile file, String bucketName, User user) throws IOException {
+        // Reserve quota first (isolated write-locked transaction)
+        boolean reserved = quotaService.reserveQuota(user.getId(), file.getSize());
+        if (!reserved) {
+            throw new IllegalArgumentException("Storage quota exceeded. Cannot upload file.");
+        }
+
         Bucket bucket = bucketRepository.findByUserAndName(user, bucketName)
                 .orElseGet(() -> {
                     Bucket newBucket = Bucket.builder()
@@ -54,22 +61,31 @@ public class StorageService {
         String driveLocation = null;
         String name = null;
 
-        if (user.getGoogleRefreshToken() != null) {
-            // Upload directly to Google Drive!
-            driveFileId = googleDriveService.uploadFile(file, user);
-            driveLocation = "Google Drive";
-            name = driveFileId;
-        } else {
-            // Ensure local storage directory exists
-            Path uploadPath = Paths.get(localDir).toAbsolutePath().normalize();
-            if (!Files.exists(uploadPath)) {
-                Files.createDirectories(uploadPath);
-            }
+        try {
+            if (user.getGoogleRefreshToken() != null) {
+                // Upload directly to Google Drive!
+                driveFileId = googleDriveService.uploadFile(file, user);
+                driveLocation = "Google Drive";
+                name = driveFileId;
+            } else {
+                // Ensure local storage directory exists
+                Path uploadPath = Paths.get(localDir).toAbsolutePath().normalize();
+                if (!Files.exists(uploadPath)) {
+                    Files.createDirectories(uploadPath);
+                }
 
-            name = UUID.randomUUID().toString() + "_" + file.getOriginalFilename();
-            Path targetLocation = uploadPath.resolve(name);
-            Files.copy(file.getInputStream(), targetLocation);
-            driveLocation = targetLocation.toString();
+                name = UUID.randomUUID().toString() + "_" + file.getOriginalFilename();
+                Path targetLocation = uploadPath.resolve(name);
+                Files.copy(file.getInputStream(), targetLocation);
+                driveLocation = targetLocation.toString();
+            }
+        } catch (Exception e) {
+            // Rollback quota reservation on upload failure
+            quotaService.releaseQuota(user.getId(), file.getSize());
+            if (e instanceof IOException) {
+                throw (IOException) e;
+            }
+            throw new IOException(e);
         }
 
         FileMetadata metadata = FileMetadata.builder()
@@ -189,15 +205,9 @@ public class StorageService {
             }
         }
         
-        long limit = 5368709120L; // 5 GB default
-        long usage = fileMetadataRepository.findByUserId(user.getId())
-                .stream()
-                .mapToLong(FileMetadata::getSize)
-                .sum();
-        
         java.util.Map<String, Long> result = new java.util.HashMap<>();
-        result.put("limit", limit);
-        result.put("usage", usage);
+        result.put("limit", user.getStorageQuota());
+        result.put("usage", user.getCurrentUsage());
         return result;
     }
 }
