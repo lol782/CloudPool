@@ -30,10 +30,19 @@ public class DatabaseRestController {
     }
 
     @PostMapping("/tables")
-    public ResponseEntity<?> createTable(@RequestBody CreateTableRequest request) {
+    public ResponseEntity<?> createTable(
+            @RequestBody CreateTableRequest request,
+            @RequestHeader(value = "X-Project-Id", required = false) String projectIdHeader) {
         try {
             User user = getAuthenticatedUser();
             UUID projectId = request.getProjectId();
+            if (projectId == null && projectIdHeader != null && !projectIdHeader.trim().isEmpty()) {
+                try {
+                    projectId = UUID.fromString(projectIdHeader);
+                } catch (Exception e) {
+                    // Ignore invalid format
+                }
+            }
             if (projectId == null) {
                 projectId = projectService.listProjects(user.getId()).get(0).getId();
             }
@@ -54,8 +63,17 @@ public class DatabaseRestController {
     }
 
     @GetMapping("/tables")
-    public ResponseEntity<List<DevTable>> listTables(@RequestParam(value = "projectId", required = false) UUID projectId) {
+    public ResponseEntity<List<DevTable>> listTables(
+            @RequestParam(value = "projectId", required = false) UUID projectId,
+            @RequestHeader(value = "X-Project-Id", required = false) String projectIdHeader) {
         User user = getAuthenticatedUser();
+        if (projectId == null && projectIdHeader != null && !projectIdHeader.trim().isEmpty()) {
+            try {
+                projectId = UUID.fromString(projectIdHeader);
+            } catch (Exception e) {
+                // Ignore invalid format
+            }
+        }
         if (projectId == null) {
             projectId = projectService.listProjects(user.getId()).get(0).getId();
         }

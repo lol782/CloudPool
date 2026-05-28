@@ -1,3 +1,106 @@
 type Query {
+    me: User
+    buckets: [Bucket!]!
+    files: [FileMetadata!]!
+    tables: [DevTable!]!
+    records(tableId: ID!): [RecordMap!]!
+    collections: [VectorCollection!]!
+    semanticSearch(collectionId: ID!, query: String!, limit: Int): [SearchResult!]!
     healthCheck: String!
+}
+
+type Mutation {
+    createBucket(name: String!, description: String): Bucket!
+    createTable(name: String!, displayName: String!, description: String, fields: [FieldInput!]!): DevTable!
+    insertRecord(tableId: ID!, data: [KeyValueInput!]!): RecordMap!
+    createCollection(name: String!, description: String, dimension: Int!, distanceMetric: String): VectorCollection!
+    indexDocument(collectionId: ID!, docId: String!, content: String!, metadata: [KeyValueInput!]): VectorDocument!
+    generateApiKey(name: String!, description: String, daysToLive: Int!): ApiKeyResponse!
+}
+
+type User {
+    id: ID!
+    email: String!
+    name: String!
+    role: String!
+    active: Boolean!
+}
+
+type Bucket {
+    id: ID!
+    name: String!
+    description: String
+    isPublic: Boolean!
+    createdAt: String!
+}
+
+type FileMetadata {
+    id: ID!
+    name: String!
+    originalName: String!
+    size: Float!
+    mimeType: String
+    extension: String
+    driveLocation: String
+    driveFileId: String
+    isPublic: Boolean!
+    isEncrypted: Boolean!
+}
+
+type DevTable {
+    id: ID!
+    name: String!
+    displayName: String!
+    description: String
+    createdAt: String!
+}
+
+type VectorCollection {
+    id: ID!
+    name: String!
+    description: String
+    dimension: Int!
+    distanceMetric: String!
+}
+
+type VectorDocument {
+    id: ID!
+    docId: String!
+    content: String!
+    metadata: String
+}
+
+type SearchResult {
+    docId: String!
+    content: String!
+    score: Float!
+}
+
+type ApiKeyResponse {
+    id: ID!
+    name: String!
+    apiKey: String!
+    createdAt: String!
+}
+
+input FieldInput {
+    fieldName: String!
+    fieldType: String!
+    isRequired: Boolean!
+}
+
+input KeyValueInput {
+    key: String!
+    value: String!
+}
+
+# Representing dynamic JSON map results
+type RecordMap {
+    id: ID!
+    fields: [KeyValueResult!]!
+}
+
+type KeyValueResult {
+    key: String!
+    value: String
 }

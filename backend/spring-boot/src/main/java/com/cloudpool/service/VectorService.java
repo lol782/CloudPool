@@ -1,38 +1,69 @@
 package com.cloudpool.service;
 
-import com.cloudpool.model.FileMetadata;
-import com.cloudpool.model.User;
+import com.cloudpool.model.*;
 import com.cloudpool.repository.FileMetadataRepository;
+import com.cloudpool.repository.VectorCollectionRepository;
+import com.cloudpool.repository.VectorDocumentRepository;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import io.weaviate.client.WeaviateClient;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
-import java.util.stream.Collectors;
+import java.util.concurrent.ConcurrentHashMap;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class VectorService {
 
     private final FileMetadataRepository fileMetadataRepository;
+    private final VectorCollectionRepository collectionRepository;
+    private final VectorDocumentRepository documentRepository;
+    private final EmbeddingService embeddingService;
+    private final WeaviateClient weaviateClient;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
+    // Cache file embeddings to avoid calling OpenAI on every search
+    private final Map<UUID, float[]> fileEmbeddingCache = new ConcurrentHashMap<>();
+
+    /**
+     * Search across uploaded files semantically
+     */
     public List<VectorSearchResult> search(String query, User user) {
         List<FileMetadata> files = fileMetadataRepository.findByUserId(user.getId());
         List<VectorSearchResult> results = new ArrayList<>();
 
-        if (query == null || query.trim().isEmpty()) {
+        if (query == null || query.trim().isEmpty() || files.isEmpty()) {
             return results;
         }
 
-        String[] queryTerms = query.toLowerCase().split("\\s+");
+        log.info("Performing real-time semantic search for query: '{}' over {} files", query, files.size());
+        float[] queryEmbedding = embeddingService.generateEmbedding(query);
 
         for (FileMetadata file : files) {
-            double score = computeRelevanceScore(file, queryTerms);
-            if (score > 0) {
+            float[] fileEmbedding = getOrGenerateFileEmbedding(file);
+            double similarity = cosineSimilarity(queryEmbedding, fileEmbedding);
+            
+            // Apply a minor boost if the filename itself contains query terms
+            double nameBoost = 0.0;
+            String nameLower = file.getOriginalName().toLowerCase();
+            for (String term : query.toLowerCase().split("\\s+")) {
+                if (nameLower.contains(term)) {
+                    nameBoost += 0.05;
+                }
+            }
+
+            double score = similarity + nameBoost;
+            if (score > 0.3) { // Similarity threshold
                 results.add(new VectorSearchResult(file, score));
             }
         }
@@ -41,53 +72,225 @@ public class VectorService {
         return results;
     }
 
-    private double computeRelevanceScore(FileMetadata file, String[] queryTerms) {
-        double score = 0.0;
-        String name = file.getOriginalName().toLowerCase();
-        String ext = file.getExtension() != null ? file.getExtension().toLowerCase() : "";
-        String bucket = file.getBucket().getName().toLowerCase();
-
-        // Load content if it's text
-        String content = "";
-        if ("txt".equalsIgnoreCase(ext) && file.getDriveLocation() != null) {
-            try {
-                Path path = Paths.get(file.getDriveLocation());
-                if (Files.exists(path)) {
-                    content = new String(Files.readAllBytes(path)).toLowerCase();
+    private float[] getOrGenerateFileEmbedding(FileMetadata file) {
+        return fileEmbeddingCache.computeIfAbsent(file.getId(), id -> {
+            String contentToEmbed = file.getOriginalName();
+            String ext = file.getExtension() != null ? file.getExtension().toLowerCase() : "";
+            
+            // Read content if text file
+            if ("txt".equalsIgnoreCase(ext) && file.getDriveLocation() != null) {
+                try {
+                    Path path = Paths.get(file.getDriveLocation());
+                    if (Files.exists(path)) {
+                        String text = new String(Files.readAllBytes(path));
+                        // Take first 500 characters of file
+                        if (text.length() > 500) {
+                            text = text.substring(0, 500);
+                        }
+                        contentToEmbed += " " + text;
+                    }
+                } catch (IOException e) {
+                    log.warn("Could not read text content for embedding: {}", e.getMessage());
                 }
-            } catch (IOException e) {
-                // Ignore content reading errors
             }
-        }
 
-        for (String term : queryTerms) {
-            if (name.contains(term)) {
-                score += 10.0; // High match for filename
-            }
-            if (bucket.contains(term)) {
-                score += 5.0; // Match in pool name
-            }
-            if (ext.equals(term)) {
-                score += 3.0; // Match in extension
-            }
-            if (!content.isEmpty() && content.contains(term)) {
-                // Count occurrences
-                int occurrences = countOccurrences(content, term);
-                score += Math.min(occurrences * 0.5, 8.0); // Caps content score contribution
-            }
-        }
-
-        return score;
+            return embeddingService.generateEmbedding(contentToEmbed);
+        });
     }
 
-    private int countOccurrences(String text, String find) {
-        int count = 0;
-        int lastIdx = 0;
-        while ((lastIdx = text.indexOf(find, lastIdx)) != -1) {
-            count++;
-            lastIdx += find.length();
+    // ── CUSTOM DEVELOPER VECTOR COLLECTIONS CRUD ──
+
+    @Transactional
+    public VectorCollection createCollection(User user, String name, String description, int dimension, String distanceMetric) {
+        // Try creating class in Weaviate
+        String className = sanitizeClassName(name);
+        try {
+            var vectorClass = io.weaviate.client.v1.schema.model.WeaviateClass.builder()
+                    .className(className)
+                    .description(description)
+                    .vectorizer("none")
+                    .build();
+
+            var res = weaviateClient.schema().classCreator()
+                    .withClass(vectorClass)
+                    .run();
+            if (res.hasErrors()) {
+                log.warn("Weaviate schema class creation reported errors: {}", res.getError().getMessages());
+            }
+        } catch (Exception e) {
+            log.warn("Weaviate class creation failed: {}. Continuing local JPA creation.", e.getMessage());
         }
-        return count;
+
+        VectorCollection collection = VectorCollection.builder()
+                .user(user)
+                .name(name)
+                .description(description)
+                .dimension(dimension)
+                .distanceMetric(distanceMetric)
+                .build();
+
+        return collectionRepository.save(collection);
+    }
+
+    @Transactional
+    public void deleteCollection(UUID collectionId, UUID userId) {
+        VectorCollection collection = collectionRepository.findById(collectionId)
+                .orElseThrow(() -> new NoSuchElementException("Collection not found"));
+        if (!collection.getUser().getId().equals(userId)) {
+            throw new SecurityException("Unauthorized access to collection");
+        }
+
+        // Delete from Weaviate
+        try {
+            weaviateClient.schema().classDeleter()
+                    .withClassName(sanitizeClassName(collection.getName()))
+                    .run();
+        } catch (Exception e) {
+            log.warn("Weaviate schema class deletion failed: {}", e.getMessage());
+        }
+
+        documentRepository.deleteByCollectionId(collectionId);
+        collectionRepository.delete(collection);
+    }
+
+    @Transactional
+    public VectorDocument indexDocument(UUID collectionId, String docId, String content, Map<String, Object> metadataMap, UUID userId) {
+        VectorCollection collection = collectionRepository.findById(collectionId)
+                .orElseThrow(() -> new NoSuchElementException("Collection not found"));
+        if (!collection.getUser().getId().equals(userId)) {
+            throw new SecurityException("Unauthorized access to collection");
+        }
+
+        float[] embedding = embeddingService.generateEmbedding(content);
+
+        // Try indexing in Weaviate
+        String className = sanitizeClassName(collection.getName());
+        try {
+            Map<String, Object> objectProperties = new HashMap<>();
+            objectProperties.put("docId", docId);
+            objectProperties.put("content", content);
+            if (metadataMap != null) {
+                objectProperties.put("metadata", metadataMap);
+            }
+
+            Float[] wrapperEmbedding = new Float[embedding.length];
+            for (int i = 0; i < embedding.length; i++) {
+                wrapperEmbedding[i] = embedding[i];
+            }
+
+            var res = weaviateClient.data().creator()
+                    .withClassName(className)
+                    .withProperties(objectProperties)
+                    .withVector(wrapperEmbedding)
+                    .run();
+            if (res.hasErrors()) {
+                log.warn("Weaviate indexing reported errors: {}", res.getError().getMessages());
+            }
+        } catch (Exception e) {
+            log.warn("Weaviate indexing failed: {}", e.getMessage());
+        }
+
+        String metadataJson = null;
+        if (metadataMap != null) {
+            try {
+                metadataJson = objectMapper.writeValueAsString(metadataMap);
+            } catch (Exception e) {
+                log.warn("Failed to serialize metadata to JSON: {}", e.getMessage());
+            }
+        }
+
+        // Delete existing doc in collection if duplicate
+        documentRepository.findByCollectionIdAndDocId(collectionId, docId)
+                .ifPresent(documentRepository::delete);
+
+        VectorDocument doc = VectorDocument.builder()
+                .collection(collection)
+                .docId(docId)
+                .content(content)
+                .embeddingVector(floatArrayToByteArray(embedding))
+                .metadata(metadataJson)
+                .build();
+
+        return documentRepository.save(doc);
+    }
+
+    public List<Map<String, Object>> searchCollection(UUID collectionId, String query, int limit, UUID userId) {
+        VectorCollection collection = collectionRepository.findById(collectionId)
+                .orElseThrow(() -> new NoSuchElementException("Collection not found"));
+        if (!collection.getUser().getId().equals(userId)) {
+            throw new SecurityException("Unauthorized access to collection");
+        }
+
+        float[] queryEmbedding = embeddingService.generateEmbedding(query);
+        List<VectorDocument> documents = documentRepository.findByCollectionId(collectionId);
+        List<Map<String, Object>> results = new ArrayList<>();
+
+        for (VectorDocument doc : documents) {
+            float[] docEmbedding = byteArrayToFloatArray(doc.getEmbeddingVector());
+            if (docEmbedding == null) continue;
+            double score = cosineSimilarity(queryEmbedding, docEmbedding);
+
+            Map<String, Object> res = new HashMap<>();
+            res.put("docId", doc.getDocId());
+            res.put("content", doc.getContent());
+            res.put("score", Math.round(score * 100.0) / 100.0);
+            try {
+                if (doc.getMetadata() != null) {
+                    res.put("metadata", objectMapper.readValue(doc.getMetadata(), Map.class));
+                }
+            } catch (Exception ignored) {}
+            results.add(res);
+        }
+
+        results.sort((a, b) -> Double.compare((Double) b.get("score"), (Double) a.get("score")));
+        if (results.size() > limit) {
+            return results.subList(0, limit);
+        }
+        return results;
+    }
+
+    // ── MATH VECTOR UTILITIES ──
+
+    public static double cosineSimilarity(float[] vectorA, float[] vectorB) {
+        if (vectorA == null || vectorB == null || vectorA.length != vectorB.length) return 0.0;
+        double dotProduct = 0.0;
+        double normA = 0.0;
+        double normB = 0.0;
+        for (int i = 0; i < vectorA.length; i++) {
+            dotProduct += vectorA[i] * vectorB[i];
+            normA += Math.pow(vectorA[i], 2);
+            normB += Math.pow(vectorB[i], 2);
+        }
+        if (normA == 0.0 || normB == 0.0) return 0.0;
+        return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
+    }
+
+    private static byte[] floatArrayToByteArray(float[] floats) {
+        if (floats == null) return null;
+        ByteBuffer buffer = ByteBuffer.allocate(floats.length * 4);
+        for (float f : floats) {
+            buffer.putFloat(f);
+        }
+        return buffer.array();
+    }
+
+    private static float[] byteArrayToFloatArray(byte[] bytes) {
+        if (bytes == null) return null;
+        ByteBuffer buffer = ByteBuffer.wrap(bytes);
+        float[] floats = new float[bytes.length / 4];
+        for (int i = 0; i < floats.length; i++) {
+            floats[i] = buffer.getFloat();
+        }
+        return floats;
+    }
+
+    private String sanitizeClassName(String name) {
+        // Weaviate class names must start with uppercase letter
+        String sanitized = name.replaceAll("[^a-zA-Z0-9_]", "");
+        if (sanitized.isEmpty()) {
+            return "CollectionClass";
+        }
+        return Character.toUpperCase(sanitized.charAt(0)) + (sanitized.length() > 1 ? sanitized.substring(1) : "");
     }
 
     @Data
@@ -105,7 +308,7 @@ public class VectorService {
             this.pool = file.getBucket().getName();
             this.size = file.getSize();
             this.type = file.getMimeType();
-            this.score = Math.round(score * 100.0) / 100.0; // Round to 2 decimal places
+            this.score = Math.round(score * 100.0) / 100.0;
         }
     }
 }

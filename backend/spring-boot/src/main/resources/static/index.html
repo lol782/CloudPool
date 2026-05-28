@@ -566,6 +566,7 @@
             <div style="display:flex; border-bottom: 1px solid var(--border2); margin-bottom: 12px; gap: 8px; padding-bottom: 6px;">
               <span id="tabVisualMode" class="chip active" style="cursor:pointer;" onclick="setProvMode('visual')">VISUAL BUILDER</span>
               <span id="tabJsonMode" class="chip" style="cursor:pointer;" onclick="setProvMode('json')">JSON SCHEMA EDITOR</span>
+              <span id="tabSqlMode" class="chip" style="cursor:pointer;" onclick="setProvMode('sql')">SQL DDL EDITOR</span>
             </div>
 
             <!-- Visual Form Container -->
@@ -629,6 +630,18 @@
     }
   ]
 }</textarea>
+            </div>
+
+            <!-- SQL DDL Editor Container -->
+            <div id="sqlProvForm" style="display:none; flex-direction:column; gap:8px; flex:1;">
+              <div class="field-label">SQL DDL DEFINITION (CREATE TABLE CODE)</div>
+              <textarea class="code-editor" id="sqlSchemaEditor" style="height:240px; font-family:var(--font); font-size:9px; line-height:1.4;">CREATE TABLE customer_leads (
+    email VARCHAR(255) NOT NULL,
+    annual_revenue DOUBLE,
+    lead_score INTEGER,
+    is_active BOOLEAN,
+    notes TEXT
+);</textarea>
             </div>
 
             <div style="margin-top: auto; padding-top: 10px;">
@@ -1480,19 +1493,27 @@
     currentProvMode = mode;
     const tabVisual = document.getElementById("tabVisualMode");
     const tabJson = document.getElementById("tabJsonMode");
+    const tabSql = document.getElementById("tabSqlMode");
     const formVisual = document.getElementById("visualProvForm");
     const formJson = document.getElementById("jsonProvForm");
+    const formSql = document.getElementById("sqlProvForm");
+
+    tabVisual.classList.remove("active");
+    tabJson.classList.remove("active");
+    tabSql.classList.remove("active");
+    formVisual.style.display = "none";
+    formJson.style.display = "none";
+    formSql.style.display = "none";
 
     if (mode === 'visual') {
       tabVisual.classList.add("active");
-      tabJson.classList.remove("active");
       formVisual.style.display = "flex";
-      formJson.style.display = "none";
-    } else {
-      tabVisual.classList.remove("active");
+    } else if (mode === 'json') {
       tabJson.classList.add("active");
-      formVisual.style.display = "none";
       formJson.style.display = "flex";
+    } else if (mode === 'sql') {
+      tabSql.classList.add("active");
+      formSql.style.display = "flex";
     }
   }
 
