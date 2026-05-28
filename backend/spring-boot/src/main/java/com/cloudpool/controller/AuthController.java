@@ -8,6 +8,7 @@ import com.cloudpool.security.JwtUtils;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
@@ -24,6 +25,7 @@ public class AuthController {
     private final BucketRepository bucketRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtUtils jwtUtils;
+    private final com.cloudpool.service.CacheService cacheService;
 
     @PostMapping("/register")
     public ResponseEntity<?> register(@RequestBody RegisterRequest request) {
@@ -81,6 +83,40 @@ public class AuthController {
         response.put("email", user.getEmail());
 
         return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/logout")
+    public ResponseEntity<?> logout(@RequestHeader(value = "Authorization", required = false) String authHeader) {
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            String token = authHeader.substring(7);
+            // Blacklist for 1 hour (matching standard JWT lifespan)
+            cacheService.blacklistToken(token, 3600000);
+            return ResponseEntity.ok(Map.of("message", "Logged out successfully"));
+        }
+        return ResponseEntity.badRequest().body(Map.of("error", "Missing Authorization header"));
+    }
+
+    @PostMapping("/oauth-credentials")
+    public ResponseEntity<?> saveOAuthCredentials(@RequestBody OAuthCredentialsRequest request) {
+        Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        if (!(principal instanceof User)) {
+            return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
+        }
+        User user = (User) principal;
+        User dbUser = userRepository.findById(user.getId())
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+        dbUser.setCustomClientId(request.getClientId() != null ? request.getClientId().trim() : null);
+        dbUser.setCustomClientSecret(request.getClientSecret() != null ? request.getClientSecret().trim() : null);
+        userRepository.save(dbUser);
+
+        return ResponseEntity.ok(Map.of("message", "OAuth App credentials saved successfully"));
+    }
+
+    @Data
+    public static class OAuthCredentialsRequest {
+        private String clientId;
+        private String clientSecret;
     }
 
     @Data
