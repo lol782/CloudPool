@@ -17,6 +17,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
 
+import com.cloudpool.service.ApiKeyUsageService;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -24,6 +25,7 @@ import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.HexFormat;
 import java.util.Optional;
+import java.util.UUID;
 
 @Component
 @RequiredArgsConstructor
@@ -32,6 +34,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final JwtUtils jwtUtils;
     private final UserRepository userRepository;
     private final ApiKeyRepository apiKeyRepository;
+    private final ApiKeyUsageService apiKeyUsageService;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
@@ -70,6 +73,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                                     user, null, Collections.singletonList(new SimpleGrantedAuthority("ROLE_" + user.getRole())));
                             authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                             SecurityContextHolder.getContext().setAuthentication(authentication);
+                            
+                            // Save key ID to request context to log usage after filter runs
+                            request.setAttribute("authenticatedApiKeyId", apiKey.getId());
                         }
                     }
                 }
@@ -78,7 +84,24 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             logger.error("Cannot set user authentication: {}", e);
         }
 
-        filterChain.doFilter(request, response);
+        try {
+            filterChain.doFilter(request, response);
+        } finally {
+            Object apiKeyIdAttr = request.getAttribute("authenticatedApiKeyId");
+            if (apiKeyIdAttr instanceof UUID) {
+                try {
+                    apiKeyUsageService.logUsage(
+                            (UUID) apiKeyIdAttr,
+                            request.getRequestURI(),
+                            request.getMethod(),
+                            response.getStatus(),
+                            request.getRemoteAddr()
+                    );
+                } catch (Exception e) {
+                    logger.error("Failed to log API key usage: " + e.getMessage());
+                }
+            }
+        }
     }
 
     private String parseJwt(HttpServletRequest request) {
