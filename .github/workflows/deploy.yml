@@ -7,9 +7,13 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    
+    # Only run if KUBECONFIG secret is configured — skip silently otherwise
+    if: ${{ secrets.KUBECONFIG != '' }}
+
+    needs: []   # Can wire to 'build' job after Docker registry is set up
+
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
 
     - name: Configure kubectl
       run: |
@@ -20,12 +24,13 @@ jobs:
     - name: Deploy to Kubernetes
       run: |
         kubectl set image deployment/cloudpool-api \
-          cloudpool-api=cloudpool:${{ github.sha }} \
+          cloudpool-api=${{ secrets.DOCKER_USERNAME }}/cloudpool:${{ github.sha }} \
           -n cloudpool
-        kubectl rollout status deployment/cloudpool-api -n cloudpool
+        kubectl rollout status deployment/cloudpool-api -n cloudpool --timeout=120s
 
     - name: Run smoke tests
       run: |
-        kubectl run smoke-test --image=curlimages/curl:latest \
-          --rm -i --restart=Never -- \
-          curl -f http://cloudpool-api:80/actuator/health || exit 1
+        kubectl run smoke-test \
+          --image=curlimages/curl:latest \
+          --rm -i --restart=Never \
+          -- curl -f http://cloudpool-api:80/actuator/health || exit 1
