@@ -24,27 +24,4 @@ public class CloudpoolApplication {
     public static void main(String[] args) {
         SpringApplication.run(CloudpoolApplication.class, args);
     }
-
-    /**
-     * Configure CORS for cross-origin requests
-     */
-    @Bean
-    public WebMvcConfigurer corsConfigurer() {
-        return new WebMvcConfigurer() {
-            @Override
-            public void addCorsMappings(CorsRegistry registry) {
-                registry.addMapping("/api/**")
-                    .allowedOrigins("*")
-                    .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
-                    .allowedHeaders("*")
-                    .maxAge(3600);
-
-                registry.addMapping("/graphql")
-                    .allowedOrigins("*")
-                    .allowedMethods("GET", "POST", "OPTIONS")
-                    .allowedHeaders("*")
-                    .maxAge(3600);
-            }
-        };
-    }
 }
