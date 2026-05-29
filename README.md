@@ -402,5 +402,3 @@ The project focuses on combining:
 * Open-source extensibility
 * Developer-first orchestration
 
-```
-```
