@@ -40,7 +40,13 @@ public class ConsoleController {
             }
         }
 
-        return ResponseEntity.ok(consoleService.executeQuery(request.getSql(), conn));
+        com.cloudpool.model.User user = null;
+        var auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null && auth.getPrincipal() instanceof com.cloudpool.model.User) {
+            user = (com.cloudpool.model.User) auth.getPrincipal();
+        }
+
+        return ResponseEntity.ok(consoleService.executeQuery(request.getSql(), conn, user));
     }
 
     @PostMapping("/redis/execute")
