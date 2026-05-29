@@ -6,84 +6,401 @@
   [![Java](https://img.shields.io/badge/Java-21-orange.svg)](https://java.com/)
   [![Rust](https://img.shields.io/badge/Rust-1.70+-black.svg)](https://www.rust-lang.org/)
   [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.x-brightgreen.svg)](https://spring.io/projects/spring-boot)
+![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)
+![Java](https://img.shields.io/badge/Java-21-orange.svg)
+![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.x-brightgreen.svg)
+![Rust](https://img.shields.io/badge/Rust-1.70+-black.svg)
+![GraphQL](https://img.shields.io/badge/GraphQL-API-E10098.svg)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Supported-336791.svg)
+![Weaviate](https://img.shields.io/badge/Weaviate-Vector_Search-blueviolet.svg)
+
 </div>
 
-<br/>
+---
 
-## Overview
+# Overview
 
-CloudPool is a high-performance, open-source Developer Infrastructure Orchestration Platform designed to unify backend services. By consolidating storage pooling, dynamic database provisioning, and vector search indexing into a single orchestration layer, CloudPool acts as a unified control plane over your local and cloud infrastructure.
+CloudPool is an open-source **Developer Infrastructure Orchestration Platform** designed to unify backend services into a single programmable infrastructure layer.
 
-Rather than replacing existing cloud providers, CloudPool seamlessly integrates them, providing developers with versioned infrastructure state tracking, secure local-to-cloud connectivity, and native Rust-powered performance extensions.
+Rather than replacing existing cloud providers, CloudPool orchestrates and abstracts infrastructure components through a centralized control plane capable of:
 
-## Core Capabilities
+- Dynamic database provisioning
+- Hybrid storage pooling
+- Embedded vector indexing
+- Infrastructure state versioning
+- Secure local-to-cloud connectivity
+- Native Rust acceleration via JNI
 
-- **Unified Infrastructure Orchestration:** Manage dynamic PostgreSQL instances, Redis caches, and local H2 environments from a single developer console.
-- **Hybrid Storage Pooling:** Connect external storage providers (e.g., Google Drive) or utilize high-performance local disk fallback. Includes secure, expirable access token management.
-- **Native Performance Layer:** Critical execution paths—including SHA-256 checksum operations, Gzip/zstd compression, and vector mathematics—are implemented in Rust and invoked via Java Native Interface (JNI) for minimal latency.
-- **Dynamic Provisioning Engine:** Dynamically provision database tables, define schemas, and execute raw SQL operations without requiring application restarts.
-- **Infrastructure Rollback:** Maintain versioned snapshots of database schemas and configuration state to enable real-time infrastructure rollbacks.
-- **Embedded Vector Search:** Out-of-the-box semantic text chunk indexing utilizing Weaviate, with a local cosine-similarity fallback powered by Rust.
+The platform combines the flexibility of **Spring Boot orchestration** with the execution performance of **Rust-native extensions**.
 
-## Architecture
+---
 
-CloudPool implements a hybrid polyglot architecture to maximize both developer productivity and raw execution speed:
+# Core Features
 
-- **Orchestration Layer (Java/Spring Boot 3.x):** Handles complex business logic, multi-protocol API routing (GraphQL/REST), user scoping, and secure multi-tenant isolation.
-- **Native FFI Module (Rust):** A compiled dynamic library strictly designed for CPU-bound computations and zero-copy data transformations.
-- **Frontend Dashboard (Vanilla JS):** A lightweight, zero-build-step Single Page Application (SPA) providing the developer console interface.
+## Infrastructure Orchestration
 
-For an exhaustive architectural deep dive, please refer to the [Architecture Blueprint](idea.md).
+- Dynamic PostgreSQL provisioning
+- Redis cache orchestration
+- Embedded H2 development environments
+- Multi-tenant infrastructure isolation
+- Unified infrastructure control layer
 
-## Getting Started
+---
 
-### Prerequisites
+## Hybrid Storage Pooling
 
-To compile and run CloudPool from source, ensure the following dependencies are installed on your host system:
+- External storage provider integration
+- Local fallback storage engine
+- Expirable access token management
+- Distributed storage abstraction
 
-- **Java Development Kit (JDK):** Version 17 or 21
-- **Rust Toolchain:** Version 1.70 or higher (including `cargo`)
-- **Maven:** A local wrapper (`apache-maven-3.9.6`) is provided in the repository.
+Supported providers include:
 
-### Build Instructions
+- Google Drive
+- Local disk storage
 
-**1. Compile the Native Rust Library**
-The core Spring Boot application dynamically loads a compiled Rust binary at runtime.
+---
+
+## Native Rust Performance Layer
+
+Critical execution paths are implemented in Rust and exposed through JNI:
+
+- SHA-256 hashing
+- zstd / Gzip compression
+- Vector mathematics
+- Cosine similarity search
+- Zero-copy transformations
+
+---
+
+## Dynamic Provisioning Engine
+
+- Runtime schema generation
+- Dynamic table creation
+- Raw SQL execution
+- Live infrastructure mutation
+- Runtime reconfiguration
+
+---
+
+## Infrastructure Rollback & Versioning
+
+- Snapshot-based state tracking
+- Infrastructure history auditing
+- Schema version management
+- Real-time rollback support
+
+---
+
+## Embedded Vector Search
+
+- Native Weaviate integration
+- Semantic text chunk indexing
+- Local vector fallback engine
+- Rust-powered cosine similarity
+
+---
+
+# System Architecture
+
+CloudPool follows a hybrid polyglot architecture optimized for orchestration flexibility and native execution performance.
+
+```mermaid
+flowchart TD
+
+    A[Frontend Dashboard<br/>Vanilla JS SPA]
+
+    A --> B[Spring Boot Orchestration Layer]
+
+    B --> C[GraphQL API]
+    B --> D[REST API]
+    B --> E[Multi-Tenant Infrastructure Engine]
+    B --> F[Dynamic Provisioning Engine]
+
+    B --> G[JNI / FFI Bridge]
+
+    G --> H[Native Rust Runtime]
+
+    H --> I[Compression Engine]
+    H --> J[SHA-256 Hashing]
+    H --> K[Vector Math Engine]
+    H --> L[Cosine Similarity Search]
+
+    B --> M[(PostgreSQL)]
+    B --> N[(Redis)]
+    B --> O[(H2 Local DB)]
+
+    B --> P[Weaviate Vector Engine]
+
+    B --> Q[Hybrid Storage Pool]
+
+    Q --> R[Google Drive]
+    Q --> S[Local Disk Storage]
+````
+
+---
+
+# Infrastructure Request Flow
+
+```mermaid
+sequenceDiagram
+
+    participant User
+    participant Dashboard
+    participant SpringBoot
+    participant RustCore
+    participant Database
+    participant Storage
+
+    User->>Dashboard: Infrastructure Request
+
+    Dashboard->>SpringBoot: GraphQL / REST Request
+
+    SpringBoot->>Database: Provision Schema
+    SpringBoot->>Storage: Allocate Storage Pool
+
+    SpringBoot->>RustCore: Execute Native Operations
+
+    RustCore-->>SpringBoot: Compression / Vector Results
+
+    SpringBoot-->>Dashboard: Infrastructure State Response
+
+    Dashboard-->>User: Updated Control Plane State
+```
+
+---
+
+# Repository Structure
+
+```mermaid
+flowchart LR
+
+    A[CloudPool]
+
+    A --> B[backend]
+    B --> C[spring-boot]
+    B --> D[rust]
+
+    A --> E[frontend]
+    A --> F[docs]
+    A --> G[idea.md]
+```
+
+---
+
+# Technology Stack
+
+| Layer                 | Technologies           |
+| --------------------- | ---------------------- |
+| Backend Orchestration | Java 21, Spring Boot 3 |
+| Native Runtime        | Rust                   |
+| APIs                  | GraphQL, REST          |
+| Database              | PostgreSQL, H2         |
+| Cache Layer           | Redis                  |
+| Vector Search         | Weaviate               |
+| Frontend              | Vanilla JavaScript     |
+| Interop Layer         | JNI / FFI              |
+
+---
+
+# Getting Started
+
+## Prerequisites
+
+Install the following dependencies:
+
+* Java JDK 17 or 21
+* Rust 1.70+
+* Cargo
+* Maven
+
+---
+
+# Build Instructions
+
+## 1. Clone Repository
+
+```bash
+git clone https://github.com/Mr-Charvaka/CloudPool.git
+
+cd CloudPool
+```
+
+---
+
+## 2. Compile Native Rust Module
 
 ```bash
 cd backend/rust
+
 cargo build --release
-Note: This generates the shared object/dynamic library (.so, .dll, or .dylib) in the target/release/ directory.
 ```
-2. Verify FFI Integration
-Before running the application, validate the JNI bindings between the JVM and the compiled Rust module.
 
+Generated binaries will appear inside:
+
+```text
+target/release/
 ```
+
+Examples:
+
+* `.dll` → Windows
+* `.so` → Linux
+* `.dylib` → macOS
+
+---
+
+## 3. Validate JNI Integration
+
+```bash
 cd ../spring-boot
-../../apache-maven-3.9.6/bin/mvn exec:java -Dexec.mainClass="com.cloudpool.util.JniTest"
+
+../../apache-maven-3.9.6/bin/mvn exec:java \
+-Dexec.mainClass="com.cloudpool.util.JniTest"
 ```
 
-3. Initialize the Application
-Run the Spring Boot application using the default local profile, which utilizes standalone H2 databases and local vector search.
+---
+
+## 4. Start CloudPool
+
+```bash
+../../apache-maven-3.9.6/bin/mvn spring-boot:run \
+-Dspring-boot.run.profiles=local
+```
+
+---
+
+# Local Development Environment
+
+The default `local` profile enables:
+
+* Embedded H2 databases
+* Local vector indexing
+* Standalone storage fallback
+* Development GraphQL playground
+
+---
+
+# Access Points
+
+| Service             | URL                              |
+| ------------------- | -------------------------------- |
+| Developer Console   | http://localhost:8080/index.html |
+| GraphQL Endpoint    | http://localhost:8080/graphql    |
+| GraphiQL Playground | http://localhost:8080/graphiql   |
+| H2 Console          | http://localhost:8080/h2-console |
+
+---
+
+# Documentation
+
+Additional documentation is available inside:
+
+```text
+/docs
+```
+
+Including:
+
+* GraphQL schemas
+* REST API specifications
+* Infrastructure architecture
+* Database design
+* Deployment notes
+* JNI / FFI implementation details
+
+---
+
+# Performance Philosophy
+
+CloudPool intentionally separates:
+
+* High-level orchestration logic
+* Low-level compute-intensive execution paths
+
+This architecture enables:
+
+* Rapid backend feature development
+* Native-speed execution
+* Reduced JVM overhead
+* Cleaner scalability boundaries
+
+---
+
+# Development Roadmap
+
+## Planned Features
+
+* Kubernetes deployment orchestration
+* Distributed worker nodes
+* WASM runtime plugins
+* Multi-node storage replication
+* Infrastructure graph visualization
+* Real-time metrics dashboard
+* Edge runtime execution engine
+
+---
+
+# Contributing
+
+We welcome open-source contributions.
+
+Areas currently open for contribution:
+
+* Rust FFI optimizations
+* GraphQL improvements
+* Frontend dashboard enhancements
+* Infrastructure provisioning adapters
+* Documentation improvements
+* Vector indexing pipelines
+
+---
+
+## Contribution Workflow
+
+```bash
+# Fork repository
+
+# Create feature branch
+git checkout -b feature/my-feature
+
+# Commit changes
+git commit -m "feat: add new infrastructure module"
+
+# Push changes
+git push origin feature/my-feature
+```
+
+Please follow:
+
+* Conventional Commits
+* Clean architecture principles
+* Minimal dependency philosophy
+
+---
+
+# License
+
+Licensed under the Apache License 2.0.
+
+See:
+
+```text
+LICENSE
+```
+
+---
+
+# Vision
+
+CloudPool aims to become a programmable infrastructure layer where developers can orchestrate databases, storage systems, vector engines, and execution runtimes through a unified high-performance control plane.
+
+The project focuses on combining:
+
+* Infrastructure abstraction
+* Native execution performance
+* Open-source extensibility
+* Developer-first orchestration
 
 ```
-../../apache-maven-3.9.6/bin/mvn spring-boot:run -Dspring-boot.run.profiles=local
 ```
-Accessing the Platform
-Upon successful startup, the following interfaces are available:
-
-Developer Console: http://localhost:8080/index.html
-GraphQL Endpoint: http://localhost:8080/graphql
-GraphiQL Playground: http://localhost:8080/graphiql
-H2 Database Console: http://localhost:8080/h2-console
-
-Documentation
-Comprehensive documentation covering REST API specifications, GraphQL schemas, database design, and deployment methodologies can be found in the docs/ directory and the main Implementation Guide.
-
-Contributing
-We welcome contributions from the open-source community. Whether you are addressing bug fixes, optimizing the Rust FFI layer, or enhancing the frontend console, please review our Contributing Guidelines to understand our development workflow, coding standards, and pull request process.
-
-Please ensure all commits adhere to the Conventional Commits specification.
-
-License
-CloudPool is licensed under the Apache License 2.0.
