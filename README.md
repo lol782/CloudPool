@@ -48,25 +48,27 @@ To compile and run CloudPool from source, ensure the following dependencies are 
 ### Build Instructions
 
 **1. Compile the Native Rust Library**
-
 The core Spring Boot application dynamically loads a compiled Rust binary at runtime.
 
 ```bash
 cd backend/rust
 cargo build --release
 Note: This generates the shared object/dynamic library (.so, .dll, or .dylib) in the target/release/ directory.
-
+```
 2. Verify FFI Integration
-
 Before running the application, validate the JNI bindings between the JVM and the compiled Rust module.
 
+```
 cd ../spring-boot
 ../../apache-maven-3.9.6/bin/mvn exec:java -Dexec.mainClass="com.cloudpool.util.JniTest"
-3. Initialize the Application
+```
 
+3. Initialize the Application
 Run the Spring Boot application using the default local profile, which utilizes standalone H2 databases and local vector search.
 
+```
 ../../apache-maven-3.9.6/bin/mvn spring-boot:run -Dspring-boot.run.profiles=local
+```
 Accessing the Platform
 Upon successful startup, the following interfaces are available:
 
@@ -74,6 +76,7 @@ Developer Console: http://localhost:8080/index.html
 GraphQL Endpoint: http://localhost:8080/graphql
 GraphiQL Playground: http://localhost:8080/graphiql
 H2 Database Console: http://localhost:8080/h2-console
+
 Documentation
 Comprehensive documentation covering REST API specifications, GraphQL schemas, database design, and deployment methodologies can be found in the docs/ directory and the main Implementation Guide.
 
