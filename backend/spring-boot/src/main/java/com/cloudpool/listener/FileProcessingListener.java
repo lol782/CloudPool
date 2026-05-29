@@ -6,6 +6,7 @@ import com.cloudpool.model.FileMetadata;
 import com.cloudpool.repository.BackgroundJobRepository;
 import com.cloudpool.repository.FileMetadataRepository;
 import com.cloudpool.service.StorageService;
+import com.cloudpool.service.GraphQLSubscriptionService;
 import com.cloudpool.util.RustBridge;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -28,6 +29,7 @@ public class FileProcessingListener {
     private final FileMetadataRepository fileMetadataRepository;
     private final BackgroundJobRepository jobRepository;
     private final ObjectMapper objectMapper;
+    private final GraphQLSubscriptionService subscriptionService;
 
     /** Typed payload DTO — ObjectMapper handles key ordering robustly */
     @Data
@@ -70,7 +72,8 @@ public class FileProcessingListener {
         BackgroundJob job = jobOpt.get();
         job.setStatus("RUNNING");
         job.setUpdatedAt(LocalDateTime.now());
-        jobRepository.save(job);
+        job = jobRepository.save(job);
+        subscriptionService.publishJobUpdate(job);
 
         try {
             // Use ObjectMapper for reliable JSON parsing regardless of key ordering
@@ -110,7 +113,8 @@ public class FileProcessingListener {
             job.setStatus("FAILED");
         } finally {
             job.setUpdatedAt(LocalDateTime.now());
-            jobRepository.save(job);
+            BackgroundJob saved = jobRepository.save(job);
+            subscriptionService.publishJobUpdate(saved);
         }
     }
 
@@ -137,7 +141,8 @@ public class FileProcessingListener {
         BackgroundJob job = jobOpt.get();
         job.setStatus("RUNNING");
         job.setUpdatedAt(LocalDateTime.now());
-        jobRepository.save(job);
+        job = jobRepository.save(job);
+        subscriptionService.publishJobUpdate(job);
 
         try {
             EmbeddingPayload payload = objectMapper.readValue(job.getPayload(), EmbeddingPayload.class);
@@ -153,7 +158,8 @@ public class FileProcessingListener {
             job.setStatus("FAILED");
         } finally {
             job.setUpdatedAt(LocalDateTime.now());
-            jobRepository.save(job);
+            BackgroundJob saved = jobRepository.save(job);
+            subscriptionService.publishJobUpdate(saved);
         }
     }
 }

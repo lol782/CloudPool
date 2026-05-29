@@ -8,14 +8,17 @@ import com.cloudpool.service.DatabaseService;
 import com.cloudpool.service.DatabaseService.FieldRequest;
 import com.cloudpool.service.StorageService;
 import com.cloudpool.service.VectorService;
+import com.cloudpool.service.GraphQLSubscriptionService;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.reactivestreams.Publisher;
 import org.springframework.graphql.data.method.annotation.Argument;
 import org.springframework.graphql.data.method.annotation.MutationMapping;
 import org.springframework.graphql.data.method.annotation.QueryMapping;
+import org.springframework.graphql.data.method.annotation.SubscriptionMapping;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Controller;
 
@@ -37,6 +40,7 @@ public class GraphQLController {
     private final BucketRepository bucketRepository;
     private final ApiKeyRepository apiKeyRepository;
     private final VectorCollectionRepository collectionRepository;
+    private final GraphQLSubscriptionService subscriptionService;
 
     private User getAuthenticatedUser() {
         var auth = SecurityContextHolder.getContext().getAuthentication();
@@ -60,9 +64,18 @@ public class GraphQLController {
     }
 
     @QueryMapping
-    public List<FileMetadata> files() {
+    public List<FileMetadata> files(@Argument Integer page, @Argument Integer size) {
         User user = getAuthenticatedUser();
-        return storageService.listUserFiles(user);
+        List<FileMetadata> allFiles = storageService.listUserFiles(user);
+        if (page == null || size == null || page < 0 || size <= 0) {
+            return allFiles;
+        }
+        int fromIndex = page * size;
+        if (fromIndex >= allFiles.size()) {
+            return Collections.emptyList();
+        }
+        int toIndex = Math.min(fromIndex + size, allFiles.size());
+        return allFiles.subList(fromIndex, toIndex);
     }
 
     @QueryMapping
@@ -274,5 +287,10 @@ public class GraphQLController {
         private String name;
         private String apiKey;
         private String createdAt;
+    }
+
+    @SubscriptionMapping
+    public Publisher<BackgroundJob> jobStatusUpdates() {
+        return subscriptionService.getJobUpdatesFlux();
     }
 }

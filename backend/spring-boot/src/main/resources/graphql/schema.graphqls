@@ -1,7 +1,7 @@
 type Query {
     me: User
     buckets: [Bucket!]!
-    files: [FileMetadata!]!
+    files(page: Int, size: Int): [FileMetadata!]!
     tables: [DevTable!]!
     records(tableId: ID!): [RecordMap!]!
     collections: [VectorCollection!]!
@@ -103,4 +103,17 @@ type RecordMap {
 type KeyValueResult {
     key: String!
     value: String
+}
+
+type BackgroundJob {
+    id: ID!
+    jobType: String!
+    status: String!
+    payload: String
+    createdAt: String!
+    updatedAt: String!
+}
+
+type Subscription {
+    jobStatusUpdates: BackgroundJob!
 }

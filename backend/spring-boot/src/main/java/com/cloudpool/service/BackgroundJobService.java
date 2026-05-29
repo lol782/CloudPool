@@ -22,14 +22,17 @@ public class BackgroundJobService {
     private final BackgroundJobRepository jobRepository;
     private final RabbitTemplate rabbitTemplate;
     private final ObjectMapper objectMapper;
+    private final GraphQLSubscriptionService subscriptionService;
 
     public BackgroundJobService(
             BackgroundJobRepository jobRepository,
             Optional<RabbitTemplate> rabbitTemplate,
-            ObjectMapper objectMapper) {
+            ObjectMapper objectMapper,
+            GraphQLSubscriptionService subscriptionService) {
         this.jobRepository = jobRepository;
         this.rabbitTemplate = rabbitTemplate.orElse(null);
         this.objectMapper = objectMapper;
+        this.subscriptionService = subscriptionService;
     }
 
     /**
@@ -60,6 +63,7 @@ public class BackgroundJobService {
                 .build();
 
         BackgroundJob saved = jobRepository.save(job);
+        subscriptionService.publishJobUpdate(saved);
 
         // Send to queue
         if (rabbitTemplate != null) {
@@ -105,6 +109,7 @@ public class BackgroundJobService {
                 .build();
 
         BackgroundJob saved = jobRepository.save(job);
+        subscriptionService.publishJobUpdate(saved);
 
         // Send to queue
         if (rabbitTemplate != null) {
