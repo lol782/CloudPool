@@ -9,6 +9,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
+import com.cloudpool.util.FileUploadValidator;
 
 import java.io.File;
 import java.io.IOException;
@@ -29,11 +30,15 @@ public class StorageService {
     private final GoogleDriveService googleDriveService;
     private final FileShareRepository fileShareRepository;
     private final QuotaService quotaService;
+    private final FileUploadValidator fileUploadValidator;
 
     @Value("${cloudpool.storage.local-dir:./storage}")
     private String localDir;
 
     public FileMetadata uploadFile(MultipartFile file, String bucketName, User user) throws IOException {
+        // Validate file uploads first
+        fileUploadValidator.validateFile(file);
+ 
         // Reserve quota first (isolated write-locked transaction)
         boolean reserved = quotaService.reserveQuota(user.getId(), file.getSize());
         if (!reserved) {

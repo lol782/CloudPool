@@ -14,6 +14,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.util.Optional;
 import java.util.UUID;
+import com.cloudpool.util.FileUploadValidator;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -39,6 +40,9 @@ public class StorageServiceTest {
 
     @Mock
     private QuotaService quotaService;
+ 
+    @Mock
+    private FileUploadValidator fileUploadValidator;
 
     @InjectMocks
     private StorageService storageService;
