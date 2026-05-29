@@ -2,6 +2,7 @@ package com.cloudpool.controller;
 
 import com.cloudpool.model.*;
 import com.cloudpool.repository.*;
+import com.cloudpool.service.AuditLogService;
 import com.cloudpool.service.StorageService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -39,7 +40,7 @@ public class FileControllerIntegrationTest {
     private StorageService storageService;
 
     @MockBean
-    private AuditLogRepository auditLogRepository;
+    private AuditLogService auditLogService;
 
     @MockBean
     private FileShareRepository fileShareRepository;

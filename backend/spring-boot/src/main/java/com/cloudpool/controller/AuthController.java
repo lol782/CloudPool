@@ -11,6 +11,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
+import com.cloudpool.service.AuditLogService;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -26,6 +27,7 @@ public class AuthController {
     private final PasswordEncoder passwordEncoder;
     private final JwtUtils jwtUtils;
     private final com.cloudpool.service.CacheService cacheService;
+    private final AuditLogService auditLogService;
 
     @PostMapping("/register")
     public ResponseEntity<?> register(@RequestBody RegisterRequest request) {
@@ -54,6 +56,8 @@ public class AuthController {
 
         String token = jwtUtils.generateToken(savedUser.getEmail());
         
+        auditLogService.log(savedUser, AuditLogService.ACTION_REGISTER, null, null, "User registered successfully");
+        
         Map<String, Object> response = new HashMap<>();
         response.put("token", token);
         response.put("name", savedUser.getName());
@@ -68,14 +72,17 @@ public class AuthController {
                 .orElse(null);
 
         if (user == null || !passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
+            auditLogService.log(null, AuditLogService.ACTION_LOGIN_FAILED, null, null, "Failed login attempt for email: " + request.getEmail());
             return ResponseEntity.status(401).body(Map.of("error", "Invalid email or password"));
         }
 
         if (!user.isActive()) {
+            auditLogService.log(user, "USER_SUSPENDED_LOGIN_ATTEMPT", null, null, "Suspended user login attempt");
             return ResponseEntity.status(403).body(Map.of("error", "User account is suspended"));
         }
 
         String token = jwtUtils.generateToken(user.getEmail());
+        auditLogService.log(user, AuditLogService.ACTION_LOGIN, null, null, "User logged in successfully");
 
         Map<String, Object> response = new HashMap<>();
         response.put("token", token);
@@ -91,6 +98,12 @@ public class AuthController {
             String token = authHeader.substring(7);
             // Blacklist for 1 hour (matching standard JWT lifespan)
             cacheService.blacklistToken(token, 3600000);
+            
+            Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+            if (principal instanceof User user) {
+                auditLogService.log(user, AuditLogService.ACTION_LOGOUT, null, null, "User logged out");
+            }
+            
             return ResponseEntity.ok(Map.of("message", "Logged out successfully"));
         }
         return ResponseEntity.badRequest().body(Map.of("error", "Missing Authorization header"));

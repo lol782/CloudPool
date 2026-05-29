@@ -1,7 +1,7 @@
 package com.cloudpool.service;
 
 import com.cloudpool.model.*;
-import com.cloudpool.repository.AuditLogRepository;
+
 import com.cloudpool.repository.BucketRepository;
 import com.cloudpool.repository.FileMetadataRepository;
 import com.cloudpool.repository.FileShareRepository;
@@ -25,7 +25,7 @@ public class StorageService {
 
     private final FileMetadataRepository fileMetadataRepository;
     private final BucketRepository bucketRepository;
-    private final AuditLogRepository auditLogRepository;
+    private final AuditLogService auditLogService;
     private final GoogleDriveService googleDriveService;
     private final FileShareRepository fileShareRepository;
     private final QuotaService quotaService;
@@ -102,15 +102,9 @@ public class StorageService {
         FileMetadata saved = fileMetadataRepository.save(metadata);
 
         // Record Audit Log
-        AuditLog log = AuditLog.builder()
-                .user(user)
-                .action("UPLOAD_FILE")
-                .resourceType("FILE")
-                .resourceId(saved.getId().toString())
-                .details(String.format("Uploaded file '%s' (%d bytes) to pool '%s' (Storage: %s)", 
-                        saved.getOriginalName(), saved.getSize(), bucket.getName(), driveFileId != null ? "Google Drive" : "Local Disk"))
-                .build();
-        auditLogRepository.save(log);
+        auditLogService.log(user, AuditLogService.ACTION_FILE_UPLOAD, "FILE", saved.getId().toString(),
+                String.format("Uploaded file '%s' (%d bytes) to pool '%s' (Storage: %s)", 
+                        saved.getOriginalName(), saved.getSize(), bucket.getName(), driveFileId != null ? "Google Drive" : "Local Disk"));
 
         return saved;
     }
@@ -140,17 +134,11 @@ public class StorageService {
         FileShare savedShare = fileShareRepository.save(fileShare);
 
         // Record Audit Log
-        AuditLog log = AuditLog.builder()
-                .user(user)
-                .action("SHARE_FILE")
-                .resourceType("FILE")
-                .resourceId(fileId.toString())
-                .details(String.format("Shared file '%s' via token (Shared with: %s, Expires: %s)", 
+        auditLogService.log(user, "SHARE_FILE", "FILE", fileId.toString(),
+                String.format("Shared file '%s' via token (Shared with: %s, Expires: %s)", 
                         metadata.getOriginalName(), 
                         sharedWithEmail != null ? sharedWithEmail : "Anyone with link",
-                        expiresAt != null ? expiresAt.toString() : "Never"))
-                .build();
-        auditLogRepository.save(log);
+                        expiresAt != null ? expiresAt.toString() : "Never"));
 
         return savedShare;
     }
@@ -177,14 +165,8 @@ public class StorageService {
         byte[] data = downloadFileDirectly(metadata);
 
         // Audit Log
-        AuditLog log = AuditLog.builder()
-                .user(user)
-                .action("DOWNLOAD_FILE")
-                .resourceType("FILE")
-                .resourceId(metadata.getId().toString())
-                .details(String.format("Downloaded file '%s'", metadata.getOriginalName()))
-                .build();
-        auditLogRepository.save(log);
+        auditLogService.log(user, AuditLogService.ACTION_FILE_DOWNLOAD, "FILE", metadata.getId().toString(),
+                String.format("Downloaded file '%s'", metadata.getOriginalName()));
 
         return data;
     }

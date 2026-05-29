@@ -250,9 +250,9 @@ public class VectorService {
                     .withLimit(limit)
                     .run();
 
-            if (!gqlResult.hasErrors() && gqlResult.getData() != null) {
+            if (!gqlResult.hasErrors() && gqlResult.getResult() != null && gqlResult.getResult().getData() != null) {
                 @SuppressWarnings("unchecked")
-                var dataMap = (java.util.LinkedHashMap<String, Object>) gqlResult.getData();
+                var dataMap = (java.util.LinkedHashMap<String, Object>) gqlResult.getResult().getData();
                 @SuppressWarnings("unchecked")
                 var getMap = (java.util.LinkedHashMap<String, Object>) dataMap.get("Get");
                 if (getMap != null) {

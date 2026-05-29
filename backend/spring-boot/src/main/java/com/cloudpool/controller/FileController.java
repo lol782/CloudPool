@@ -1,7 +1,7 @@
 package com.cloudpool.controller;
 
 import com.cloudpool.model.*;
-import com.cloudpool.repository.AuditLogRepository;
+import com.cloudpool.service.AuditLogService;
 import com.cloudpool.repository.FileMetadataRepository;
 import com.cloudpool.repository.FileShareRepository;
 import com.cloudpool.service.StorageService;
@@ -26,7 +26,7 @@ import java.util.*;
 public class FileController {
 
     private final StorageService storageService;
-    private final AuditLogRepository auditLogRepository;
+    private final AuditLogService auditLogService;
     private final FileShareRepository fileShareRepository;
     private final FileMetadataRepository fileMetadataRepository;
 
@@ -80,7 +80,7 @@ public class FileController {
     @GetMapping("/logs")
     public ResponseEntity<List<AuditLog>> getLogs() {
         User user = getAuthenticatedUser();
-        List<AuditLog> logs = auditLogRepository.findLatestLogs(user.getId(), PageRequest.of(0, 10));
+        List<AuditLog> logs = auditLogService.getRecentLogs(user.getId(), 10);
         return ResponseEntity.ok(logs);
     }
 
@@ -123,14 +123,8 @@ public class FileController {
             byte[] data = storageService.downloadFileDirectly(metadata);
 
             // Audit Log (system action / anonymous download)
-            AuditLog log = AuditLog.builder()
-                    .user(metadata.getBucket().getUser()) // Attribute log to file owner
-                    .action("DOWNLOAD_SHARED_FILE")
-                    .resourceType("FILE")
-                    .resourceId(metadata.getId().toString())
-                    .details(String.format("Shared file '%s' downloaded via token by anonymous user", metadata.getOriginalName()))
-                    .build();
-            auditLogRepository.save(log);
+            auditLogService.log(metadata.getBucket().getUser(), "DOWNLOAD_SHARED_FILE", "FILE", metadata.getId().toString(),
+                    String.format("Shared file '%s' downloaded via token by anonymous user", metadata.getOriginalName()));
 
             MediaType mediaType = MediaType.APPLICATION_OCTET_STREAM;
             if (metadata.getMimeType() != null) {

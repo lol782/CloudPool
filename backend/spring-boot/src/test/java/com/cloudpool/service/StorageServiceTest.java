@@ -29,7 +29,7 @@ public class StorageServiceTest {
     private BucketRepository bucketRepository;
 
     @Mock
-    private AuditLogRepository auditLogRepository;
+    private AuditLogService auditLogService;
 
     @Mock
     private GoogleDriveService googleDriveService;
@@ -91,7 +91,7 @@ public class StorageServiceTest {
         assertNotNull(result);
         assertEquals("test.txt", result.getOriginalName());
         verify(fileMetadataRepository).save(any(FileMetadata.class));
-        verify(auditLogRepository).save(any(AuditLog.class));
+        verify(auditLogService).log(any(), any(), any(), any(), any());
     }
 
     @Test

@@ -10,6 +10,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
+import com.cloudpool.service.AuditLogService;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -25,6 +26,7 @@ public class ApiKeyController {
 
     private final ApiKeyRepository apiKeyRepository;
     private final ApiKeyUsageService apiKeyUsageService;
+    private final AuditLogService auditLogService;
 
     private User getAuthenticatedUser() {
         return (User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
@@ -58,6 +60,8 @@ public class ApiKeyController {
                 .build();
 
         ApiKey saved = apiKeyRepository.save(apiKey);
+ 
+        auditLogService.log(user, AuditLogService.ACTION_API_KEY_CREATE, "API_KEY", saved.getId().toString(), "Generated API key: " + saved.getName());
 
         Map<String, Object> response = new HashMap<>();
         response.put("id", saved.getId());
@@ -81,6 +85,7 @@ public class ApiKeyController {
             return ResponseEntity.status(403).body(Map.of("error", "Access denied"));
         }
         apiKeyRepository.delete(key);
+        auditLogService.log(user, AuditLogService.ACTION_API_KEY_DELETE, "API_KEY", key.getId().toString(), "Deleted API key: " + key.getName());
         return ResponseEntity.ok(Map.of("message", "API key deleted successfully"));
     }
 
