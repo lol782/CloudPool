@@ -31,6 +31,7 @@ public class StorageService {
     private final FileShareRepository fileShareRepository;
     private final QuotaService quotaService;
     private final FileUploadValidator fileUploadValidator;
+    private final MetricsService metricsService;
 
     @Value("${cloudpool.storage.local-dir:./storage}")
     private String localDir;
@@ -111,6 +112,7 @@ public class StorageService {
                 String.format("Uploaded file '%s' (%d bytes) to pool '%s' (Storage: %s)", 
                         saved.getOriginalName(), saved.getSize(), bucket.getName(), driveFileId != null ? "Google Drive" : "Local Disk"));
 
+        metricsService.incrementFileUploads();
         return saved;
     }
 
@@ -173,6 +175,7 @@ public class StorageService {
         auditLogService.log(user, AuditLogService.ACTION_FILE_DOWNLOAD, "FILE", metadata.getId().toString(),
                 String.format("Downloaded file '%s'", metadata.getOriginalName()));
 
+        metricsService.incrementFileDownloads();
         return data;
     }
 

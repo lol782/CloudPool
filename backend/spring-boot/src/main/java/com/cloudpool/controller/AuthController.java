@@ -28,6 +28,7 @@ public class AuthController {
     private final JwtUtils jwtUtils;
     private final com.cloudpool.service.CacheService cacheService;
     private final AuditLogService auditLogService;
+    private final com.cloudpool.service.MetricsService metricsService;
 
     @PostMapping("/register")
     public ResponseEntity<?> register(@RequestBody RegisterRequest request) {
@@ -73,16 +74,19 @@ public class AuthController {
 
         if (user == null || !passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
             auditLogService.log(null, AuditLogService.ACTION_LOGIN_FAILED, null, null, "Failed login attempt for email: " + request.getEmail());
+            metricsService.incrementAuthFailure();
             return ResponseEntity.status(401).body(Map.of("error", "Invalid email or password"));
         }
 
         if (!user.isActive()) {
             auditLogService.log(user, "USER_SUSPENDED_LOGIN_ATTEMPT", null, null, "Suspended user login attempt");
+            metricsService.incrementAuthFailure();
             return ResponseEntity.status(403).body(Map.of("error", "User account is suspended"));
         }
 
         String token = jwtUtils.generateToken(user.getEmail());
         auditLogService.log(user, AuditLogService.ACTION_LOGIN, null, null, "User logged in successfully");
+        metricsService.incrementAuthSuccess();
 
         Map<String, Object> response = new HashMap<>();
         response.put("token", token);

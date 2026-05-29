@@ -44,6 +44,9 @@ public class StorageServiceTest {
     @Mock
     private FileUploadValidator fileUploadValidator;
 
+    @Mock
+    private MetricsService metricsService;
+
     @InjectMocks
     private StorageService storageService;
 
