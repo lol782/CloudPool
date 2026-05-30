@@ -45,6 +45,7 @@ public class SecurityConfig {
             .csrf(csrf -> csrf.disable())
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(AntPathRequestMatcher.antMatcher("/actuator/**")).permitAll()
+                .requestMatchers(AntPathRequestMatcher.antMatcher("/api/health")).permitAll()
                 .requestMatchers(AntPathRequestMatcher.antMatcher("/graphql")).authenticated()
                 .requestMatchers(AntPathRequestMatcher.antMatcher("/graphiql/**")).hasRole("ADMIN")
                 .requestMatchers(AntPathRequestMatcher.antMatcher("/h2-console/**")).permitAll()
